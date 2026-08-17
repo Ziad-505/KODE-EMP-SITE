@@ -1,0 +1,34 @@
+{
+  "name": "kode-portal",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "docker compose -f docker-compose.dev.yml up --build",
+    "dev:local": "pnpm -r --parallel --filter=./apps/* --filter=./packages/* dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @kode/api test:e2e",
+    "db:migrate": "pnpm --filter @kode/api db:migrate",
+    "db:deploy": "pnpm --filter @kode/api db:deploy",
+    "db:seed": "pnpm --filter @kode/api db:seed",
+    "db:studio": "pnpm --filter @kode/api db:studio",
+    "setup": "pnpm --filter @kode/contracts build && pnpm --filter @kode/api exec prisma generate",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm -r test && pnpm --filter @kode/api test:boot"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  }
+}

@@ -1,0 +1,559 @@
+// KODE Sports Club employee portal — data model.
+//
+// Conventions:
+//  - cuid() ids everywhere; never expose sequential integers.
+//  - Every content table carries `status`, `departmentId` (null = org-wide) and
+//    `searchVector` so the same query helpers work across all of them.
+//  - Deletes on content are soft (`deletedAt`) so the audit trail stays honest.
+//  - AuditLog has no update or delete path in the application layer at all.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ------------------------------------------------------------------ identity */
+
+enum Role {
+  SUPER_ADMIN
+  CONTENT_MANAGER
+  CONTENT_EDITOR
+  DEPARTMENT_EDITOR
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum AuthProvider {
+  LOCAL
+  ENTRA_ID
+}
+
+model Department {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  colour      String  @default("#244EA2")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users    User[]
+  articles Article[]
+  events   Event[]
+  policies Policy[]
+  faqs     Faq[]
+  albums   GalleryAlbum[]
+  media    Media[]
+
+  @@map("departments")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  firstName    String
+  lastName     String
+  jobTitle     String?
+  phone        String?
+  role         Role         @default(EMPLOYEE)
+  status       UserStatus   @default(ACTIVE)
+  provider     AuthProvider @default(LOCAL)
+
+  /// Argon2id hash. Null for Entra-only accounts.
+  passwordHash        String?
+  mustChangePassword  Boolean   @default(false)
+  passwordChangedAt   DateTime?
+
+  /// Entra ID object id (`oid` claim). Unique when present.
+  entraObjectId String? @unique
+  entraTenantId String?
+
+  /// Permissions granted directly, on top of whatever the role provides.
+  extraPermissions String[] @default([])
+
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  avatarMediaId String? @unique
+  avatarMedia   Media?  @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  refreshTokens     RefreshToken[]
+  uploadedMedia     Media[]         @relation("MediaUploader")
+  authoredArticles  Article[]       @relation("ArticleAuthor")
+  auditEntries      AuditLog[]      @relation("AuditActor")
+  requestedTickets  SupportTicket[] @relation("TicketRequester")
+  assignedTickets   SupportTicket[] @relation("TicketAssignee")
+
+  @@index([departmentId])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+/// Refresh tokens are rotated on every use. `familyId` groups a login session:
+/// re-use of a already-rotated token revokes the whole family, which is the
+/// standard detection for a stolen refresh token.
+model RefreshToken {
+  id         String   @id @default(cuid())
+  /// SHA-256 of the token. The raw value never touches the database.
+  tokenHash  String   @unique
+  familyId   String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt  DateTime
+  rotatedAt  DateTime?
+  revokedAt  DateTime?
+  revokedReason String?
+
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/// Short-lived state for the Entra ID authorization-code flow (PKCE + nonce).
+model OidcState {
+  id            String   @id @default(cuid())
+  state         String   @unique
+  codeVerifier  String
+  nonce         String
+  redirectTo    String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("oidc_states")
+}
+
+/* --------------------------------------------------------------------- media */
+
+model Media {
+  id         String  @id @default(cuid())
+  filename   String
+  storageKey String  @unique
+  mimeType   String
+  size       Int
+  checksum   String
+  width      Int?
+  height     Int?
+  alt        String?
+  title      String?
+
+  uploadedById String?
+  uploadedBy   User?   @relation("MediaUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  /**
+   * Owning department, stamped from the uploader at upload time. NULL means
+   * club-wide, matching every other content model. Without this the media
+   * library had no scoping at all: a Department Editor could list every
+   * document in the club, including other teams' policy PDFs.
+   */
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  avatarOf       User?           @relation("UserAvatar")
+  articleCovers  Article[]       @relation("ArticleCover")
+  eventCovers    Event[]         @relation("EventCover")
+  policyDocs     Policy[]        @relation("PolicyDocument")
+  albumCovers    GalleryAlbum[]  @relation("AlbumCover")
+  galleryItems   GalleryItem[]
+  ticketFiles    TicketAttachment[]
+
+  @@index([mimeType])
+  @@index([createdAt])
+  @@index([departmentId])
+  @@map("media")
+}
+
+/* ------------------------------------------------------------------- content */
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model Article {
+  id       String        @id @default(cuid())
+  slug     String        @unique
+  title    String
+  excerpt  String?
+  body     String
+  category String        @default("Club life")
+  pinned   Boolean       @default(false)
+  status   ContentStatus @default(DRAFT)
+
+  coverMediaId String?
+  coverMedia   Media?  @relation("ArticleCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  authorId String?
+  author   User?   @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([status, publishedAt])
+  @@index([departmentId])
+  @@index([deletedAt])
+  @@map("articles")
+}
+
+/**
+ * The namespaces a taxonomy term can belong to.
+ *
+ * This enum is deliberately closed and the terms inside it are deliberately
+ * not. Adding a *kind of list* is a modelling decision that warrants a
+ * migration; adding an entry *to* a list is an editorial decision that should
+ * take an admin ten seconds. Those were previously the same operation, which
+ * is why "add an event kind" meant a schema change, a hand-written
+ * `ALTER TYPE`, a contracts rebuild and a coordinated redeploy of three
+ * artifacts.
+ */
+enum TaxonomyKind {
+  EVENT_KIND
+  ARTICLE_CATEGORY
+  FAQ_CATEGORY
+  TICKET_CATEGORY
+}
+
+/**
+ * An admin-managed term. Replaces the `EventKind` Postgres enum, and is the
+ * intended home for article, FAQ and ticket categories, which are currently
+ * modelled two other ways (a second enum and unconstrained free text).
+ *
+ * `key` is immutable and machine-facing; `label` is what people see and may be
+ * renamed freely, which is what makes "Club Life" and "club life" impossible
+ * to create as separate things. `isSystem` marks terms the seed installs and
+ * the UI refuses to delete, so an admin cannot empty a list the code assumes
+ * is non-empty.
+ *
+ * Terms are archived rather than deleted once used, because a hard delete
+ * would either orphan rows or cascade into content.
+ */
+model Taxonomy {
+  id         String       @id @default(cuid())
+  kind       TaxonomyKind
+  key        String
+  label      String
+  description String?
+  colour     String       @default("#244EA2")
+  sortOrder  Int          @default(0)
+  isSystem   Boolean      @default(false)
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events Event[] @relation("EventKindTerm")
+
+  @@unique([kind, key])
+  @@index([kind, archivedAt, sortOrder])
+  @@map("taxonomies")
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  description String
+  // Restrict, not Cascade or SetNull: deleting a term that events still use
+  // must fail loudly rather than silently retyping or untyping those events.
+  // The service archives instead, and the UI never offers the delete.
+  kindId      String
+  kind        Taxonomy      @relation("EventKindTerm", fields: [kindId], references: [id], onDelete: Restrict)
+  location    String
+  startsAt    DateTime
+  endsAt      DateTime?
+  capacity    Int?
+  status      ContentStatus @default(DRAFT)
+
+  coverMediaId String?
+  coverMedia   Media?  @relation("EventCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, startsAt])
+  @@index([departmentId])
+  @@index([deletedAt])
+  @@index([kindId])
+  @@map("events")
+}
+
+model Policy {
+  id      String        @id @default(cuid())
+  slug    String        @unique
+  title   String
+  summary String?
+  body    String
+  version String        @default("1.0")
+  status  ContentStatus @default(DRAFT)
+
+  effectiveFrom DateTime?
+  reviewDueAt   DateTime?
+
+  documentMediaId String?
+  documentMedia   Media?  @relation("PolicyDocument", fields: [documentMediaId], references: [id], onDelete: SetNull)
+
+  /// null = general policy, visible to every employee.
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([departmentId])
+  @@index([reviewDueAt])
+  @@index([deletedAt])
+  @@map("policies")
+}
+
+model Faq {
+  id       String        @id @default(cuid())
+  question String
+  answer   String
+  category String        @default("Workplace")
+  position Int           @default(0)
+  status   ContentStatus @default(DRAFT)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, position])
+  @@index([deletedAt])
+  @@map("faqs")
+}
+
+model GalleryAlbum {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  description String?
+  status      ContentStatus @default(DRAFT)
+  takenOn     DateTime?
+
+  coverMediaId String?
+  coverMedia   Media?  @relation("AlbumCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  items GalleryItem[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("gallery_albums")
+}
+
+model GalleryItem {
+  id       String @id @default(cuid())
+  albumId  String
+  album    GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  mediaId  String
+  media    Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  caption  String?
+  position Int    @default(0)
+
+  @@unique([albumId, mediaId])
+  @@index([albumId, position])
+  @@map("gallery_items")
+}
+
+model QuickLink {
+  id          String        @id @default(cuid())
+  title       String
+  url         String
+  description String?
+  icon        String        @default("external")
+  position    Int           @default(0)
+  status      ContentStatus @default(PUBLISHED)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, position])
+  @@map("quick_links")
+}
+
+/* ------------------------------------------------------------------ support */
+
+enum TicketStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  HARDWARE
+  SOFTWARE
+  NETWORK
+  ACCESS
+  OTHER
+}
+
+model SupportTicket {
+  id        String         @id @default(cuid())
+  /// Human-facing reference, e.g. KODE-IT-000142. Unique, monotonic.
+  reference String         @unique
+  subject   String
+  body      String
+  category  TicketCategory @default(OTHER)
+  priority  TicketPriority @default(NORMAL)
+  status    TicketStatus   @default(OPEN)
+  location  String?
+  resolution String?
+
+  requesterId String
+  requester   User   @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  assigneeId String?
+  assignee   User?   @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  /// Set once the outbound notification to the IT inbox succeeded.
+  notifiedAt DateTime?
+
+  attachments TicketAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([requesterId])
+  @@map("support_tickets")
+}
+
+model TicketAttachment {
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  mediaId  String
+  media    Media         @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, mediaId])
+  @@map("ticket_attachments")
+}
+
+/// Outbound email queue. Written in the same transaction as the ticket so a
+/// crash between "ticket saved" and "email sent" cannot lose the notification.
+model OutboxMessage {
+  id          String    @id @default(cuid())
+  topic       String
+  payload     Json
+  attempts    Int       @default(0)
+  lastError   String?
+  processedAt DateTime?
+  nextAttemptAt DateTime @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([processedAt, nextAttemptAt])
+  @@map("outbox_messages")
+}
+
+/* -------------------------------------------------------------------- audit */
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  PUBLISH
+  ARCHIVE
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  ROLE_CHANGE
+  PASSWORD_CHANGE
+  PERMISSION_DENIED
+  UPLOAD
+}
+
+/// Append-only. The application layer exposes no update or delete path, and the
+/// migration revokes UPDATE/DELETE on this table from the application role.
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  entityType String
+  entityId   String?
+  summary    String
+
+  actorId String?
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  /// { field: { from, to } } for UPDATE actions.
+  changes   Json?
+  ipAddress String?
+  userAgent String?
+  requestId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

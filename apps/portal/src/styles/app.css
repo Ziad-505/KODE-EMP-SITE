@@ -1,0 +1,2006 @@
+/* ---------------------------------------------------------------------------
+   Router links replace the draft's <button> navigation, so anchors have to
+   inherit the button styling rather than the browser's default blue underline.
+   --------------------------------------------------------------------------- */
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.floating-header nav a,
+.site-footer nav a,
+.mobile-drawer nav a,
+.editorial-list a,
+.rush-events a,
+.story-slip,
+.mosaic-tile,
+.line-button,
+.link-card,
+.album-card,
+.account-menu a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* The nav items were buttons; anchors need the same box. */
+.floating-header nav a {
+  height: 35px;
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  padding: 0 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.floating-header nav a:hover,
+.floating-header nav a.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.line-button {
+  display: inline-flex;
+}
+
+.mosaic-tile,
+.story-slip {
+  display: flex;
+}
+
+.story-slip {
+  display: grid;
+}
+
+.editorial-list a {
+  width: 100%;
+  min-height: 155px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 70px 1fr 22px;
+  align-items: center;
+  gap: 20px;
+  text-align: left;
+}
+
+.editorial-list article:first-child a {
+  border-top: 0;
+}
+
+.rush-events a {
+  width: 100%;
+  min-height: 125px;
+  border-bottom: 1px solid rgba(21, 22, 43, 0.4);
+  display: grid;
+  grid-template-columns: 70px 1fr 20px;
+  align-items: center;
+  gap: 20px;
+  text-align: left;
+  padding: 15px 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Additions to the original design.
+
+   Nothing here restyles an existing surface. It covers the shells the static
+   draft never had (sign-in, mobile navigation, loading and empty states,
+   pagination, detail pages) plus the fixes called out in the review.
+   --------------------------------------------------------------------------- */
+
+/* Keyboard users get a way past the fixed header before the hero. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 40;
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+/* --------------------------------------------------------------- header bits */
+
+.menu-button {
+  /* Shown by the max-width:850px rule further down. app.css loads after
+     base.css, so the reveal has to live here too or this rule wins. */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #fff;
+}
+
+.menu-button svg {
+  width: 18px;
+}
+
+.header-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-button {
+  position: relative;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.account-button .avatar {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: var(--lime);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.account-menu {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 232px;
+  background: var(--cream);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 10px 10px 0 rgba(21, 22, 43, 0.16);
+  padding: 6px;
+  text-align: left;
+}
+
+.account-menu > p {
+  margin: 0;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.account-menu > p small {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  color: var(--blue);
+}
+
+.account-menu button,
+.account-menu a {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.account-menu button:hover,
+.account-menu a:hover {
+  background: var(--gold);
+}
+
+.account-menu svg {
+  width: 15px;
+}
+
+/* --------------------------------------------------------- mobile navigation */
+
+.mobile-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: var(--ink);
+  color: #fff;
+  padding: 92px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  animation: drawer-in 0.22s ease-out both;
+}
+
+.mobile-drawer nav {
+  display: grid;
+  gap: 2px;
+}
+
+.mobile-drawer nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 58px;
+  padding: 0 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  text-decoration: none;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.mobile-drawer nav a[aria-current='page'] {
+  color: var(--lime);
+}
+
+.mobile-drawer nav a svg {
+  width: 18px;
+  opacity: 0.55;
+}
+
+.mobile-drawer footer {
+  margin-top: auto;
+  padding-top: 26px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ sign-in */
+
+.auth-screen {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  background: var(--cream);
+}
+
+.auth-poster {
+  position: relative;
+  overflow: hidden;
+  background: var(--blue);
+  color: #fff;
+  padding: clamp(36px, 5vw, 72px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+/* Sized against the poster, not the viewport. At `62vw` on a wide screen the
+   shape was over a thousand pixels across inside a column half that wide, so
+   most of it sat outside the panel and the visible part read as a crop rather
+   than a composition. */
+.auth-poster:before {
+  content: '';
+  position: absolute;
+  width: 66%;
+  height: 0;
+  padding-bottom: 66%;
+  border-radius: 50%;
+  background: var(--orange);
+  right: -20%;
+  bottom: -26%;
+  opacity: 0.9;
+}
+
+.auth-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-lockup img {
+  width: 34px;
+  height: 36px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.auth-lockup span {
+  font-size: 10px;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+}
+
+.auth-lockup span b {
+  display: block;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--lime);
+}
+
+.auth-poster > * {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-poster h1 {
+  font-size: clamp(44px, 5vw, 88px);
+  line-height: 0.79;
+  letter-spacing: -0.09em;
+  margin: 18px 0 20px;
+  font-weight: 800;
+}
+
+.auth-poster h1 em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--lime);
+}
+
+.auth-poster p {
+  max-width: 320px;
+  font-size: 14px;
+  line-height: 1.65;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* The bars reuse the hero's rhythm idea but must not reuse its keyframes. The
+   `rhythm` animation grows a bar to 25vh, which is right for `.hero-rhythm`
+   (inset 0, full bleed) and wrong here, where the strip is 60px tall and not
+   clipped. On a phone that meant 210px bars drawn straight over the poster's
+   description text. These bars scale within their own box instead. */
+.auth-poster .auth-rhythm {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  height: 60px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.auth-rhythm i {
+  flex: 1;
+  height: 60px;
+  background: var(--lime);
+  transform: skewX(-16deg) scaleY(0.12);
+  transform-origin: bottom;
+  animation: authRhythm 4.8s ease-in-out infinite;
+}
+
+.auth-rhythm i:nth-child(2n) {
+  background: var(--pink);
+  animation-delay: -1.1s;
+}
+
+.auth-rhythm i:nth-child(3n) {
+  background: var(--gold);
+  animation-delay: -2.5s;
+}
+
+@keyframes authRhythm {
+  0%,
+  100% {
+    transform: skewX(-16deg) scaleY(0.12);
+  }
+  50% {
+    transform: skewX(-16deg) scaleY(1);
+  }
+}
+
+.auth-panel {
+  display: grid;
+  place-items: center;
+  padding: clamp(28px, 5vw, 64px);
+  position: relative;
+}
+
+/* A hairline frame gives the form somewhere to sit. Without it the card floated
+   in the middle of a large empty cream field on a desktop screen. */
+.auth-card {
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: clamp(26px, 3.5vw, 42px);
+}
+
+.auth-card h2 {
+  font-size: clamp(32px, 3.4vw, 44px);
+  line-height: 0.86;
+  letter-spacing: -0.07em;
+  margin: 14px 0 10px;
+}
+
+.auth-card > p {
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 500;
+  margin: 0 0 24px;
+  color: rgba(21, 22, 43, 0.72);
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  width: 100%;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--ink);
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.field-error {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pink);
+}
+
+.field[data-invalid='true'] input,
+.field[data-invalid='true'] select,
+.field[data-invalid='true'] textarea {
+  border-color: var(--pink);
+}
+
+.form-alert {
+  margin: 0;
+  padding: 13px;
+  background: var(--pink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.form-alert[data-tone='success'] {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.ink-button[disabled],
+.outline-button[disabled],
+.line-button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 26px 0;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(21, 22, 43, 0.5);
+}
+
+.auth-divider:before,
+.auth-divider:after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.entra-button {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.entra-button:hover {
+  background: var(--ink);
+  color: #fff;
+}
+
+.entra-mark {
+  display: grid;
+  grid-template-columns: 8px 8px;
+  gap: 2px;
+}
+
+.entra-mark i {
+  width: 8px;
+  height: 8px;
+}
+
+.entra-mark i:nth-child(1) {
+  background: #f25022;
+}
+.entra-mark i:nth-child(2) {
+  background: #7fba00;
+}
+.entra-mark i:nth-child(3) {
+  background: #00a4ef;
+}
+.entra-mark i:nth-child(4) {
+  background: #ffb900;
+}
+
+.auth-hint {
+  margin: 24px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  font-weight: 500;
+  color: rgba(21, 22, 43, 0.65);
+}
+
+/* -------------------------------------------------- states and pagination */
+
+.state-block {
+  padding: clamp(60px, 10vw, 130px) 24px;
+  text-align: center;
+}
+
+.state-block span {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 24px;
+  display: grid;
+  place-items: center;
+  background: var(--orange);
+  color: var(--ink);
+  transform: rotate(-9deg);
+  font-size: 11px;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+}
+
+.state-block h2 {
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 0.9;
+  letter-spacing: -0.07em;
+  margin: 0;
+}
+
+.state-block p {
+  max-width: 380px;
+  margin: 16px auto 22px;
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(21, 22, 43, 0.07);
+}
+
+.skeleton:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.3s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-row {
+  height: 155px;
+  margin-bottom: 17px;
+}
+
+.pagination {
+  max-width: 1040px;
+  margin: 0 auto clamp(70px, 10vw, 130px);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.pagination button {
+  border: 1px solid var(--ink);
+  background: transparent;
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination button:hover:not([disabled]) {
+  background: var(--ink);
+  color: #fff;
+}
+
+.pagination button[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------- detail page */
+
+.article-detail {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: clamp(60px, 8vw, 110px) 24px clamp(70px, 10vw, 140px);
+}
+
+.article-detail .back-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+  margin-bottom: 28px;
+  text-decoration: none;
+}
+
+.article-detail .back-link svg {
+  width: 15px;
+  transform: rotate(180deg);
+}
+
+.article-detail h1 {
+  font-size: clamp(36px, 5vw, 66px);
+  line-height: 0.88;
+  letter-spacing: -0.07em;
+  margin: 14px 0 18px;
+}
+
+.article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.article-cover {
+  width: 100%;
+  margin: 28px 0;
+  display: block;
+}
+
+.article-body {
+  font-size: 16px;
+  line-height: 1.75;
+  font-weight: 500;
+}
+
+.article-body p {
+  margin: 0 0 20px;
+}
+
+.doc-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: var(--blue);
+  color: #fff;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.doc-download svg {
+  width: 16px;
+}
+
+/* ------------------------------------------------------------------ directory */
+
+.people-grid {
+  max-width: 1120px;
+  margin: clamp(60px, 9vw, 120px) auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.person-card {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+
+.person-card .person-avatar {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  background: var(--dept, var(--blue));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.person-card b {
+  font-size: 16px;
+  letter-spacing: -0.03em;
+}
+
+.person-card small {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(21, 22, 43, 0.7);
+}
+
+.person-card .person-dept {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--dept, var(--blue));
+}
+
+.person-card a {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.filter-bar {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-bar input {
+  flex: 1;
+  min-width: 200px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 13px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filter-bar button {
+  border: 1px solid var(--line);
+  background: transparent;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.filter-bar button[aria-pressed='true'] {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- link cards */
+
+.link-grid {
+  max-width: 1120px;
+  margin: clamp(60px, 9vw, 120px) auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.link-card {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 22px;
+  display: grid;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--ink);
+  min-height: 150px;
+  align-content: start;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.link-card:hover {
+  transform: translateY(-4px);
+  background: var(--cream);
+}
+
+.link-card b {
+  font-size: 22px;
+  letter-spacing: -0.05em;
+}
+
+.link-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 500;
+}
+
+.link-card span {
+  margin-top: auto;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+  word-break: break-all;
+}
+
+/* ---------------------------------------------------------------- my tickets */
+
+.ticket-list {
+  max-width: 1040px;
+  margin: 0 auto clamp(70px, 10vw, 140px);
+  padding: 0 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.ticket-row {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 20px;
+  align-items: start;
+}
+
+.ticket-row b {
+  font-size: 15px;
+  letter-spacing: -0.03em;
+}
+
+.ticket-row small {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-chip {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 6px 8px;
+  background: rgba(21, 22, 43, 0.08);
+  white-space: nowrap;
+}
+
+.status-chip[data-status='OPEN'] {
+  background: var(--gold);
+}
+.status-chip[data-status='IN_PROGRESS'] {
+  background: var(--blue);
+  color: #fff;
+}
+.status-chip[data-status='RESOLVED'],
+.status-chip[data-status='CLOSED'] {
+  background: var(--lime);
+}
+
+/* -------------------------------------------------------------- gallery grid */
+
+.album-grid {
+  max-width: 1120px;
+  margin: clamp(60px, 9vw, 120px) auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.album-card {
+  position: relative;
+  border: 0;
+  min-height: 240px;
+  padding: 20px;
+  text-align: left;
+  color: #fff;
+  background: var(--ink);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.album-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.62;
+}
+
+.album-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.album-card b {
+  font-size: 24px;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.album-card span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  color: var(--lime);
+}
+
+.album-photos {
+  max-width: 1120px;
+  margin: 0 auto clamp(70px, 10vw, 140px);
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.album-photos img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+/* ------------------------------------------------------------- misc utilities */
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ responsive */
+
+@media (max-width: 900px) {
+  .auth-screen {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  /* A banner, not half the screen. The poster used to claim a 320px minimum
+     and then push the first form field below the fold on a phone. */
+  .auth-poster {
+    min-height: 0;
+    padding: 26px 24px 22px;
+    gap: 20px;
+  }
+
+  .auth-poster h1 {
+    font-size: clamp(38px, 11vw, 54px);
+    margin: 14px 0 12px;
+  }
+
+  .auth-poster p {
+    max-width: none;
+    font-size: 13px;
+  }
+
+  .auth-poster:before {
+    width: 46%;
+    padding-bottom: 46%;
+    right: -18%;
+    bottom: -30%;
+  }
+
+  .auth-poster .auth-rhythm {
+    height: 22px;
+  }
+
+  .auth-rhythm i {
+    height: 22px;
+  }
+
+  .auth-panel {
+    padding: 26px 24px 48px;
+    align-items: start;
+  }
+
+  .auth-card {
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .auth-card h2 {
+    font-size: 38px;
+  }
+}
+
+@media (max-width: 850px) {
+  .menu-button {
+    display: inline-flex;
+  }
+
+  .header-actions .global-search span {
+    display: none;
+  }
+
+  .header-actions .global-search kbd {
+    display: none;
+  }
+
+  .account-button > span {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  /* The hero sculpture overlapped the primary call to action at this width.
+     The decorative tags and orbit caption step aside; the ring stays. */
+  .sculpture-tag,
+  .orbit-text {
+    display: none;
+  }
+
+  .hero-sculpture {
+    top: 56%;
+    right: -34%;
+    opacity: 0.8;
+  }
+
+  .hero-copy {
+    padding-bottom: 40px;
+  }
+
+  .ticket-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Scroll cinema.
+
+   The draft drove this with GSAP ScrollTrigger, which pinned the panel from
+   JavaScript and cost about half the portal's JS payload for one section. The
+   panel is now pinned with `position: sticky` (possible because the ancestor
+   `overflow: hidden` that broke sticky has been removed) and every moving part
+   is a CSS transform reading a single `--progress` custom property that a
+   throttled scroll listener writes. Under reduced motion the listener never
+   attaches, `--progress` stays at its 0 default, and everything renders in its
+   resting position.
+   --------------------------------------------------------------------------- */
+
+.cinema-scroll {
+  --progress: 0;
+}
+
+.cinema-pin {
+  position: sticky;
+  top: 18px;
+}
+
+/* Every anchored element starts from the same centring translate, so rotation
+   and scale compose on top of it instead of replacing it. */
+.cinema-anchor {
+  transform: translate(-50%, -50%);
+}
+
+/* The mark scales but never rotates. Rotating a logo is a brand violation, and
+   at the old 180deg it also spent the middle of the scroll upside down. The
+   orbits carry the rotation instead, which is what the eye reads as motion. */
+.cinema-core {
+  transform: translate(-50%, -50%) scale(calc(1 - 0.28 * var(--progress)));
+}
+
+.cinema-orbit-a {
+  transform: translate(-50%, -50%) rotate(calc(250deg * var(--progress)));
+}
+
+.cinema-orbit-b {
+  transform: translate(-50%, -50%) rotate(calc(-310deg * var(--progress)));
+}
+
+.cinema-route {
+  transform: skewX(-16deg) scaleX(calc(0.05 + 0.95 * min(1, var(--progress) * 1.6)));
+}
+
+.cinema-pulse {
+  transform: scaleX(calc(0.06 + 0.94 * min(1, var(--progress) * 1.45)));
+}
+
+.cinema-headline {
+  transform: translateX(calc(-16% * var(--progress)));
+}
+
+/* Each card fades and settles across its own slice of the scroll.
+
+   `--enter` values are deliberately early and the ramp is 1/5 of the track
+   rather than 1/6. The old schedule put the last card's entry at 0.58 and the
+   scroll section is 300vh tall, so on a 1080px screen roughly 1250px of
+   scrolling passed with the panel pinned and nothing moving. Ending the last
+   entry near 0.75 leaves a short settled beat at the end instead of a long
+   dead one in the middle. */
+.cinema-card {
+  --in: clamp(0, calc((var(--progress) - var(--enter, 0.1)) * 5), 1);
+  opacity: var(--in);
+  transform: translateY(calc(38% * (1 - var(--in))))
+    rotate(calc(var(--rest, 5deg) + (var(--tilt, 6deg) * (1 - var(--in)))));
+  transition: none;
+}
+
+.cinema-blue {
+  --enter: 0.06;
+  --rest: 5deg;
+  --tilt: 6deg;
+}
+
+.cinema-gold {
+  --enter: 0.28;
+  --rest: -4deg;
+  --tilt: -5deg;
+}
+
+.cinema-pink {
+  --enter: 0.5;
+  --rest: 3deg;
+  --tilt: 4deg;
+}
+
+.cinema-card:active {
+  transform: scale(0.98) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cinema-card {
+    opacity: 1;
+    transform: rotate(var(--rest, 5deg));
+  }
+
+  .cinema-route {
+    transform: skewX(-16deg) scaleX(1);
+  }
+
+  .cinema-pulse {
+    transform: scaleX(1);
+  }
+
+  /* The centring translate is layout, not motion, so it has to survive here. */
+  .cinema-core,
+  .cinema-orbit-a,
+  .cinema-orbit-b {
+    transform: translate(-50%, -50%);
+  }
+
+  .cinema-headline {
+    transform: none;
+  }
+
+  .cinema-scroll {
+    height: auto;
+  }
+
+  .cinema-pin {
+    position: relative;
+    height: auto;
+    min-height: 620px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Page transitions and scroll reveal.
+
+   Only the home page had any motion. Everything below gives the inner pages a
+   short enter animation and gives each tab a reveal that matches what it does:
+   editorial rows arrive from the margin, calendar entries drop in, tiles pop,
+   form fields stack up. All of it is CSS driven by `data-revealed`, which the
+   observer in lib/reveal.ts sets, so there is no animation library and nothing
+   runs off the main thread's critical path.
+   --------------------------------------------------------------------------- */
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-swap {
+  animation: pageIn 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* The banner is the first thing on every inner page, so it gets its own
+   slightly slower entrance and a rule that wipes in beneath the title. */
+.inner-banner h1 {
+  animation: pageIn 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: 0.04s;
+}
+
+.inner-banner p {
+  animation: pageIn 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: 0.12s;
+}
+
+/* --- reveal ------------------------------------------------------------- */
+
+[data-reveal] {
+  opacity: 0;
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition-delay: calc(var(--reveal-index, 0) * 55ms);
+  will-change: opacity, transform;
+}
+
+[data-revealed='true'] {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* News and policies read as a printed index, so the rows arrive from the
+   margin rather than from below. */
+[data-reveal='row'] {
+  transform: translateX(-24px);
+}
+
+/* Calendar entries fall onto the line, which is what a date does. */
+[data-reveal='date'] {
+  transform: translateY(-16px);
+}
+
+/* Directory, FAQ, gallery and link cards are objects, so they scale up. */
+[data-reveal='tile'] {
+  transform: scale(0.94);
+}
+
+/* Form fields stack from the bottom in the order they are filled. */
+[data-reveal='field'] {
+  transform: translateY(14px);
+}
+
+[data-reveal='card'] {
+  transform: translateY(20px);
+}
+
+/* --- hover, lower home sections ----------------------------------------- */
+
+/* Every interactive block below the fold now answers the pointer. The common
+   pattern is a short lift plus an arrow that travels, which is cheap (two
+   composited properties) and consistent across the three sections. */
+
+.story-slip {
+  transition:
+    transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1),
+    background 0.28s ease,
+    box-shadow 0.28s ease;
+}
+
+.story-slip:hover {
+  transform: translateX(-10px);
+  background: var(--cream);
+  box-shadow: -12px 12px 0 0 var(--ink);
+}
+
+.story-slip .slip-visual {
+  transition: clip-path 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.story-slip .slip-visual b {
+  transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.story-slip:hover .slip-visual b {
+  transform: translate(-6px, -6px) scale(1.08);
+}
+
+.story-slip > svg,
+.rush-events > :is(a, button) > svg,
+.mosaic-tile > svg {
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.story-slip:hover > svg,
+.rush-events > :is(a, button):hover > svg,
+.mosaic-tile:hover > svg {
+  transform: translateX(6px);
+}
+
+/* Calendar rows sit on a ruled grid, so the hover fills the row rather than
+   moving it, and the date block is what steps forward. */
+.rush-events > :is(a, button) {
+  position: relative;
+  transition: color 0.28s ease;
+}
+
+.rush-events > :is(a, button):before {
+  content: '';
+  position: absolute;
+  inset: 0 -16px;
+  z-index: -1;
+  background: var(--ink);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.rush-events > :is(a, button):hover {
+  color: var(--cream);
+}
+
+.rush-events > :is(a, button):hover:before {
+  transform: scaleY(1);
+}
+
+.rush-events time {
+  transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.rush-events > :is(a, button):hover time {
+  transform: translateX(6px);
+}
+
+/* Tiles are solid colour blocks, so the affordance is a lift with a hard
+   offset shadow in the club ink rather than a soft blur. */
+.mosaic-tile {
+  overflow: hidden;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.mosaic-tile:before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 62%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.mosaic-tile:hover {
+  transform: translate(-6px, -6px);
+  box-shadow: 12px 12px 0 0 var(--ink);
+}
+
+.mosaic-tile:hover:before {
+  opacity: 1;
+}
+
+.mosaic-tile h3 {
+  transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.mosaic-tile:hover h3 {
+  transform: translateY(-4px);
+}
+
+.mosaic-tile:active,
+.story-slip:active {
+  transform: scale(0.99);
+  box-shadow: none;
+}
+
+/* Cinema cards get the same vocabulary, but must not fight the scroll-driven
+   transform, so only the shadow and the arrow respond. */
+.cinema-card {
+  transition: box-shadow 0.28s ease;
+}
+
+.cinema-card:hover {
+  filter: none;
+  box-shadow: 10px 10px 0 0 rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-swap,
+  .inner-banner h1,
+  .inner-banner p {
+    animation: none;
+  }
+
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .story-slip:hover,
+  .mosaic-tile:hover,
+  .story-slip:hover .slip-visual b,
+  .rush-events > :is(a, button):hover time,
+  .mosaic-tile:hover h3 {
+    transform: none;
+  }
+}
+
+/* Pointer-driven effects should not fire on touch, where `:hover` sticks after
+   a tap and leaves a row looking selected. */
+@media (hover: none) {
+  .story-slip:hover,
+  .mosaic-tile:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .rush-events > :is(a, button):hover:before {
+    transform: scaleY(0);
+  }
+
+  .rush-events > :is(a, button):hover {
+    color: inherit;
+  }
+}
+
+/* --- sign-in handoff ----------------------------------------------------- */
+
+.auth-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--blue);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 22px;
+  color: #fff;
+  clip-path: inset(0 0 100% 0);
+  animation: curtainClose 0.42s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.auth-curtain img {
+  width: 74px;
+  height: 78px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0;
+  animation: curtainMark 0.44s cubic-bezier(0.22, 0.61, 0.36, 1) 0.28s both;
+}
+
+.auth-curtain span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--lime);
+  opacity: 0;
+  animation: curtainMark 0.4s ease-out 0.4s both;
+}
+
+@keyframes curtainClose {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes curtainMark {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The panel steps back as the curtain rises, so the two read as one movement
+   rather than as a cover dropped over a still page. */
+.auth-screen[data-handoff='true'] .auth-poster,
+.auth-screen[data-handoff='true'] .auth-panel {
+  transition:
+    transform 0.42s cubic-bezier(0.65, 0, 0.35, 1),
+    opacity 0.42s ease;
+  transform: scale(0.985);
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-curtain,
+  .auth-curtain img,
+  .auth-curtain span {
+    animation: none;
+    clip-path: none;
+    opacity: 1;
+  }
+
+  .auth-screen[data-handoff='true'] .auth-poster,
+  .auth-screen[data-handoff='true'] .auth-panel {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* ===========================================================================
+   Inner pages: density, identity and touch targets.
+
+   The home page carried the entire design language — solid colour blocks, hard
+   offset shadows, oversized numerals, the -16deg skew — and the other nine tabs
+   carried a banner, a grey search box and a hairline-bordered list. They
+   reflowed correctly at every width (a measured sweep at 390, 768, 1024 and
+   1440 found zero horizontal overflow), so the problem was never the layout: it
+   was that the pages looked like a template with a KODE banner glued on top.
+
+   This section gives the inner pages the same vocabulary as the home page,
+   closes the large dead vertical gaps, and brings every control up to a usable
+   tap size.
+   =========================================================================== */
+
+/* --- rhythm --------------------------------------------------------------
+   The gap between the banner and the first row was up to 120px of nothing,
+   because the toolbar and the grid each carried their own generous top margin.
+   One scale, applied once. */
+
+.inner-page {
+  --page-gutter: clamp(20px, 5vw, 48px);
+  --page-max: 1180px;
+  padding-top: 84px;
+  padding-bottom: clamp(64px, 9vw, 120px);
+  min-height: 80vh;
+  background: var(--paper);
+}
+
+.filter-bar {
+  max-width: var(--page-max);
+  margin: clamp(28px, 4vw, 52px) auto 0;
+  padding: 0 var(--page-gutter);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.people-grid,
+.editorial-list,
+.link-grid,
+.album-grid {
+  margin-top: clamp(24px, 3.5vw, 40px);
+  margin-bottom: 0;
+}
+
+.people-grid {
+  max-width: var(--page-max);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 var(--page-gutter);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+/* --- the toolbar ---------------------------------------------------------
+   A plain grey input with no label reads as a form field on a settings page.
+   This is the primary control on six of the nine tabs, so it gets the club's
+   own treatment: an ink rule, the skew bullet, and a live result count in
+   tabular figures so it does not jitter as you type. */
+
+.filter-bar {
+  position: relative;
+}
+
+.filter-bar:before {
+  content: '';
+  position: absolute;
+  left: var(--page-gutter);
+  right: var(--page-gutter);
+  top: -1px;
+  height: 2px;
+  background: var(--ink);
+}
+
+.filter-bar input {
+  flex: 1 1 240px;
+  min-width: 0;
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.filter-bar input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 5px 5px 0 0 var(--ink);
+}
+
+.filter-bar input::placeholder {
+  color: rgba(21, 22, 43, 0.45);
+  font-weight: 600;
+}
+
+.filter-bar button {
+  border: 1px solid var(--ink);
+  background: transparent;
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.filter-bar button:hover,
+.filter-bar button[aria-pressed='true'] {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* Result count. Rendered by the routes as `.result-count`. */
+.result-count {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: rgba(21, 22, 43, 0.55);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-count:before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--blue);
+  transform: skewX(-16deg);
+}
+
+/* --- people --------------------------------------------------------------
+   The directory is the tab people open when they need a human, so the card is
+   built around the department colour and the contact details are the payload,
+   not a footnote. */
+
+.person-card {
+  position: relative;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 20px;
+  display: grid;
+  gap: 11px;
+  text-align: left;
+  overflow: hidden;
+  transition:
+    transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 0.24s ease;
+}
+
+/* A department stripe rather than a floating coloured square. */
+.person-card:before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--dept, var(--blue));
+}
+
+.person-card:hover {
+  transform: translate(-4px, -4px);
+  border-color: var(--ink);
+  box-shadow: 8px 8px 0 0 var(--ink);
+}
+
+/* Square, not skewed. The -16deg device belongs on small solid shapes; applied
+   to an avatar it skews the initials with it, because they are a text node and
+   cannot be counter-skewed. */
+.person-card .person-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 0;
+}
+
+.person-card a {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  word-break: break-word;
+}
+
+.person-card a:hover {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+/* --- editorial lists (news, policies, FAQs) ------------------------------ */
+
+.editorial-list {
+  max-width: var(--page-max);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 var(--page-gutter);
+}
+
+.editorial-list a,
+.editorial-list article > button {
+  position: relative;
+  padding: 24px 0;
+  min-height: 0;
+  transition:
+    padding-left 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+    background 0.24s ease;
+}
+
+.editorial-list a:hover,
+.editorial-list article > button:hover {
+  padding-left: 14px;
+  background: var(--cream);
+}
+
+/* The index numeral picks up the home page's oversized-figure treatment. */
+.editorial-list a > span:first-child,
+.editorial-list article > button > span:first-child {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: rgba(21, 22, 43, 0.28);
+  transition: color 0.24s ease;
+}
+
+.editorial-list a:hover > span:first-child,
+.editorial-list article > button:hover > span:first-child {
+  color: var(--blue);
+}
+
+/* --- link and album cards ------------------------------------------------ */
+
+.link-card,
+.album-card {
+  transition:
+    transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 0.24s ease;
+}
+
+.link-card:hover,
+.album-card:hover {
+  transform: translate(-4px, -4px);
+  border-color: var(--ink);
+  background: var(--paper);
+  box-shadow: 8px 8px 0 0 var(--ink);
+}
+
+/* --- touch targets -------------------------------------------------------
+   Measured across all ten routes at 390px: footer links rendered at 18px tall,
+   the header brand at 27px, the search trigger at 31px and inline text links at
+   11px. Padding alone would change the layout, so the hit area is grown with a
+   pseudo-element where the visual size has to stay put. */
+
+.site-footer nav a,
+.site-footer nav button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 2px;
+}
+
+.brand-button {
+  min-height: 40px;
+}
+
+.global-search {
+  min-height: 40px;
+}
+
+.line-button {
+  min-height: 40px;
+  align-items: center;
+}
+
+/* Any inline anchor inside body copy that would otherwise be an 11px target. */
+.inner-page p a,
+.article-detail a,
+.row-drawer a {
+  position: relative;
+}
+
+.inner-page p a:after,
+.article-detail a:after,
+.row-drawer a:after {
+  content: '';
+  position: absolute;
+  inset: -12px -4px;
+}
+
+/* --- narrow viewports ---------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .inner-page {
+    padding-top: 76px;
+  }
+
+  .filter-bar {
+    gap: 8px;
+  }
+
+  .filter-bar input {
+    flex: 1 1 100%;
+  }
+
+  .result-count {
+    order: -1;
+    width: 100%;
+  }
+
+  .people-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .editorial-list a:hover,
+  .editorial-list article > button:hover {
+    padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .person-card,
+  .link-card,
+  .album-card,
+  .editorial-list a,
+  .editorial-list article > button {
+    transition: none;
+  }
+
+  .person-card:hover,
+  .link-card:hover,
+  .album-card:hover {
+    transform: none;
+  }
+}
+
+@media (hover: none) {
+  .person-card:hover,
+  .link-card:hover,
+  .album-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .editorial-list a:hover,
+  .editorial-list article > button:hover {
+    padding-left: 0;
+    background: transparent;
+  }
+}
+
+/* Printing must never inherit the scroll-reveal's hidden default: a printed
+   page has no scroll events, so every unrevealed element would come out blank. */
+@media print {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* The header controls measured 34px, just under the 36px minimum a thumb needs.
+   Raised here rather than in base.css because app.css loads second and the
+   base rules set an explicit 34px height. */
+.menu-button,
+.account-button,
+.global-search {
+  min-height: 36px;
+  height: auto;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}

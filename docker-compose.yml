@@ -1,0 +1,146 @@
+# Production stack. Copy .env.example to .env, fill it in, then:
+#   docker compose up -d --build
+#
+# Caddy terminates TLS with an automatically issued certificate and is the only
+# published port. Postgres and the API are reachable only on the internal
+# network, so the database is never exposed to the internet.
+name: kode-portal
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-kode_portal}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-kode_portal}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # No `ports:` on purpose. Reach it with `docker compose exec postgres psql`.
+    networks: [internal]
+    logging: &logging
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: always
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      TRUST_PROXY: 'true'
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kode_portal}?schema=public&connection_limit=${DATABASE_POOL_SIZE:-10}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
+      API_PUBLIC_URL: https://${PORTAL_DOMAIN:?set PORTAL_DOMAIN}
+      PORTAL_PUBLIC_URL: https://${PORTAL_DOMAIN}
+      ADMIN_PUBLIC_URL: https://${ADMIN_DOMAIN:?set ADMIN_DOMAIN}
+      CORS_ORIGINS: https://${PORTAL_DOMAIN},https://${ADMIN_DOMAIN}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+      ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-14}
+      ENTRA_ENABLED: ${ENTRA_ENABLED:-false}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+      ENTRA_REDIRECT_URI: ${ENTRA_REDIRECT_URI:-}
+      ENTRA_ALLOWED_DOMAINS: ${ENTRA_ALLOWED_DOMAINS:-}
+      ENTRA_AUTO_PROVISION: ${ENTRA_AUTO_PROVISION:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-KODE Portal <no-reply@kodesportsclub.com>}
+      IT_SUPPORT_INBOX: ${IT_SUPPORT_INBOX:?set IT_SUPPORT_INBOX}
+      UPLOAD_DIR: /app/storage/uploads
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - uploads:/app/storage/uploads
+    networks: [internal]
+    logging: *logging
+
+  portal:
+    build:
+      context: .
+      dockerfile: apps/portal/Dockerfile
+      args:
+        APP: portal
+        VITE_API_URL: /api/v1
+    restart: always
+    networks: [internal]
+    logging: *logging
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        APP: admin
+        VITE_API_URL: /api/v1
+        VITE_PORTAL_URL: https://${PORTAL_DOMAIN}
+    restart: always
+    networks: [internal]
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on: [api, portal, admin]
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      PORTAL_DOMAIN: ${PORTAL_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [internal, public]
+    logging: *logging
+
+  # Nightly pg_dump with a retention window. Restore instructions are in
+  # docs/RUNBOOK.md; a backup nobody has restored is not a backup.
+  backup:
+    image: postgres:16-alpine
+    restart: always
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-kode_portal}
+      PGHOST: postgres
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+      - ./infra/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ['/bin/sh', '/usr/local/bin/backup.sh']
+    networks: [internal]
+    logging: *logging
+
+networks:
+  internal:
+    internal: true
+  public: {}
+
+volumes:
+  postgres-data:
+  uploads:
+  caddy-data:
+  caddy-config:

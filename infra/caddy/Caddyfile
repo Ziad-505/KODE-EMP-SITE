@@ -1,0 +1,53 @@
+{
+	email {$ACME_EMAIL}
+	# Certificates are obtained and renewed automatically over HTTP-01/TLS-ALPN.
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+		-Server
+	}
+}
+
+# ------------------------------------------------------------ employee portal
+{$PORTAL_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+
+	# The API is served from the same origin as the SPA, which is what lets the
+	# session cookie stay SameSite=Lax rather than needing SameSite=None.
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle /media/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy portal:80
+	}
+}
+
+# ---------------------------------------------------------------------- CMS
+{$ADMIN_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle /media/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy admin:80
+	}
+}
