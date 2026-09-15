@@ -1,6 +1,12 @@
 node_modules
 **/node_modules
 **/dist
+# TypeScript's incremental cache. `**/dist` is excluded but this was not, so a
+# developer's local build state was copied into the image, where tsc trusted it,
+# decided everything was already emitted and skipped the build — exiting 0 while
+# `deleteOutDir` had just removed dist. The image then shipped with no main.js
+# and the container crash-looped. Build inputs must not include host state.
+**/*.tsbuildinfo
 **/coverage
 .git
 .github

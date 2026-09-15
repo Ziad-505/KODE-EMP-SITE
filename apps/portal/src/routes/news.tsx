@@ -48,7 +48,7 @@ export function NewsPage() {
                     {String((page - 1) * 12 + index + 1).padStart(2, '0')}
                   </span>
                   <div>
-                    <small>{item.category.toUpperCase()}</small>
+                    <small>{item.category.label.toUpperCase()}</small>
                     <h2>{item.title}</h2>
                     <p>{item.excerpt ?? formatDate(item.publishedAt ?? item.createdAt)}</p>
                   </div>
@@ -92,7 +92,7 @@ export function ArticlePage() {
         <Link className="back-link" to="/news">
           <Icon name="arrow" /> ALL CLUB NEWS
         </Link>
-        <p className="micro-label">{data.category.toUpperCase()}</p>
+        <p className="micro-label">{data.category.label.toUpperCase()}</p>
         <h1>{data.title}</h1>
         <div className="article-meta">
           <span className="tnum">{formatDate(data.publishedAt ?? data.createdAt)}</span>

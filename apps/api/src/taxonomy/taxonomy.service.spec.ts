@@ -217,4 +217,33 @@ describe('TaxonomyService', () => {
       await expect(service.assertUsable('t1', TaxonomyKind.EVENT_KIND)).resolves.toBeUndefined();
     });
   });
+
+  describe('usage counts across every namespace', () => {
+    // Each namespace reads a different table and a different column; getting
+    // one wrong would silently report every term as unused, which is what
+    // enables the delete button.
+    const cases = [
+      [TaxonomyKind.EVENT_KIND, 'event', 'kindId'],
+      [TaxonomyKind.ARTICLE_CATEGORY, 'article', 'categoryId'],
+      [TaxonomyKind.FAQ_CATEGORY, 'faq', 'categoryId'],
+      [TaxonomyKind.TICKET_CATEGORY, 'supportTicket', 'categoryId'],
+    ] as const;
+
+    it.each(cases)('counts %s usage from the right table', async (kind, model, column) => {
+      const service = build({
+        taxonomy: { findMany: async () => [term({ kind })] },
+        [model]: { groupBy: async () => [{ [column]: 't1', _count: { _all: 4 } }] },
+      });
+      const rows = await service.list({ kind, includeArchived: false });
+      expect(rows[0]?.usageCount).toBe(4);
+    });
+
+    it('refuses to delete a used term in any namespace', async () => {
+      const service = build({
+        taxonomy: { findUnique: async () => term({ kind: TaxonomyKind.TICKET_CATEGORY }) },
+        supportTicket: { groupBy: async () => [{ categoryId: 't1', _count: { _all: 3 } }] },
+      });
+      await expect(service.remove('t1', actor)).rejects.toThrow(/used by 3 items/);
+    });
+  });
 });

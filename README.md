@@ -88,6 +88,12 @@ Caddy obtains and renews TLS certificates automatically on first request. The
 only published ports are 80 and 443. PostgreSQL and the API sit on an internal
 Docker network and are not reachable from the internet.
 
+**Deploying on a VM the internet cannot reach** — the usual case for an
+intranet — needs `TLS_MODE=internal`, because Let's Encrypt validates by
+connecting to the host and cannot. The full procedure, including DNS, the
+firewall and trusting the certificate, is in
+[docs/DEPLOY-INTERNAL.md](docs/DEPLOY-INTERNAL.md).
+
 Operational procedures, including restores, are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ---

@@ -10,7 +10,7 @@
     "dev": "docker compose -f docker-compose.dev.yml up --build",
     "dev:local": "pnpm -r --parallel --filter=./apps/* --filter=./packages/* dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @kode/contracts build && pnpm -r typecheck",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

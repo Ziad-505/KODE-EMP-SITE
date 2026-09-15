@@ -77,6 +77,22 @@ describe('Application bootstrap and global guards (e2e)', () => {
       $on: () => undefined,
     };
     for (const name of models) stub[name] = { ...model };
+
+    // The JWT guard re-checks on every request that the account behind a token
+    // still exists and is not suspended — a deliberate control, so that
+    // suspending someone ends their session without waiting for the token to
+    // expire. It reads `user.findFirst`, which the blanket stub answers with
+    // null, so every authenticated request 401s and none of the authorization
+    // tests below can reach the permission checks they exist to prove.
+    //
+    // The user model therefore answers that liveness probe with an active row.
+    // Every other model stays empty, which is what keeps this a wiring test
+    // rather than a data test.
+    stub.user = {
+      ...model,
+      findFirst: async (args?: { where?: { id?: string } }) =>
+        args?.where?.id ? { id: args.where.id } : null,
+    };
     return stub;
   }
 

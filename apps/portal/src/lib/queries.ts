@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  TaxonomyDto,
+  TaxonomyKind,
   AlbumDto,
   ArticleDto,
   CreateTicketInput,
@@ -38,6 +40,18 @@ export const keys = {
 };
 
 const PAGE_SIZE = 12;
+
+/**
+ * Admin-managed terms. Readable by any signed-in employee, because the support
+ * form needs the category names; the API refuses writes without
+ * `settings:manage`.
+ */
+export const useTaxonomy = (kind: TaxonomyKind) =>
+  useQuery({
+    queryKey: ['taxonomy', kind],
+    queryFn: () => api.get<TaxonomyDto[]>('/taxonomy', { kind }),
+    staleTime: 5 * 60_000,
+  });
 
 export const useHome = () =>
   useQuery({ queryKey: keys.home, queryFn: () => api.get<PortalHomeDto>('/portal/home') });

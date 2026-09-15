@@ -131,7 +131,7 @@ export function HomePage() {
                   </div>
                   <div>
                     <small>
-                      {item.category.toUpperCase()} /{' '}
+                      {item.category.label.toUpperCase()} /{' '}
                       {formatDate(item.publishedAt ?? item.createdAt)}
                     </small>
                     <h3>{item.title}</h3>

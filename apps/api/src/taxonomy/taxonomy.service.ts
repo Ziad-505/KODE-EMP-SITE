@@ -33,20 +33,62 @@ export class TaxonomyService {
 
   /**
    * Usage counts drive the CMS delete affordance, so they are computed here
-   * rather than left to the client. Only event kinds have a relation today; the
-   * other three namespaces are wired in the same place when their columns move
-   * off enums and free text.
+   * rather than left to the client. All four namespaces are wired: each reads
+   * its own table through its own indexed foreign key.
    */
   private async usageFor(kind: TaxonomyKind, ids: string[]): Promise<Map<string, number>> {
     const counts = new Map<string, number>(ids.map((id) => [id, 0]));
-    if (kind !== TaxonomyKind.EVENT_KIND || ids.length === 0) return counts;
+    if (ids.length === 0) return counts;
 
-    const grouped = await this.prisma.event.groupBy({
-      by: ['kindId'],
-      where: { kindId: { in: ids }, deletedAt: null },
-      _count: { _all: true },
-    });
-    for (const row of grouped) counts.set(row.kindId, row._count._all);
+    /*
+     * One group-by per namespace against its own indexed foreign key, rather
+     * than a query per term. Support tickets have no `deletedAt`, so their
+     * filter differs; everything else excludes soft-deleted rows, because a
+     * term used only by deleted content should read as unused and be
+     * deletable.
+     */
+    const apply = (rows: { id: string | null; count: number }[]) => {
+      for (const row of rows) if (row.id) counts.set(row.id, row.count);
+    };
+
+    switch (kind) {
+      case TaxonomyKind.EVENT_KIND: {
+        const rows = await this.prisma.event.groupBy({
+          by: ['kindId'],
+          where: { kindId: { in: ids }, deletedAt: null },
+          _count: { _all: true },
+        });
+        apply(rows.map((r) => ({ id: r.kindId, count: r._count._all })));
+        break;
+      }
+      case TaxonomyKind.ARTICLE_CATEGORY: {
+        const rows = await this.prisma.article.groupBy({
+          by: ['categoryId'],
+          where: { categoryId: { in: ids }, deletedAt: null },
+          _count: { _all: true },
+        });
+        apply(rows.map((r) => ({ id: r.categoryId, count: r._count._all })));
+        break;
+      }
+      case TaxonomyKind.FAQ_CATEGORY: {
+        const rows = await this.prisma.faq.groupBy({
+          by: ['categoryId'],
+          where: { categoryId: { in: ids }, deletedAt: null },
+          _count: { _all: true },
+        });
+        apply(rows.map((r) => ({ id: r.categoryId, count: r._count._all })));
+        break;
+      }
+      case TaxonomyKind.TICKET_CATEGORY: {
+        const rows = await this.prisma.supportTicket.groupBy({
+          by: ['categoryId'],
+          where: { categoryId: { in: ids } },
+          _count: { _all: true },
+        });
+        apply(rows.map((r) => ({ id: r.categoryId, count: r._count._all })));
+        break;
+      }
+    }
     return counts;
   }
 

@@ -4,6 +4,7 @@ import {
   AuditAction,
   ContentStatus,
   Permission,
+  TaxonomyKind,
   type AdminListQuery,
   type ChangeStatusInput,
   type CreateFaqInput,
@@ -14,6 +15,7 @@ import {
 } from '@kode/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { TaxonomyService } from '../taxonomy/taxonomy.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ContentPolicy, orderByFor, pageMeta, type ContentPermissionSet } from './content.policy';
 
@@ -24,7 +26,10 @@ const PERMISSIONS: ContentPermissionSet = {
   publish: Permission.FAQ_PUBLISH,
 };
 
+const CATEGORY_SELECT = { select: { id: true, key: true, label: true, colour: true } };
+
 const INCLUDE = {
+  category: CATEGORY_SELECT,
   department: { select: { id: true, name: true, colour: true } },
 } satisfies Prisma.FaqInclude;
 type FaqRow = Prisma.FaqGetPayload<{ include: typeof INCLUDE }>;
@@ -35,12 +40,17 @@ export class FaqsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly policy: ContentPolicy,
+    private readonly taxonomy: TaxonomyService,
   ) {}
 
   async listPublic(query: PublicListQuery, actor: AuthenticatedUser | null): Promise<Page<FaqDto>> {
     const where: Prisma.FaqWhereInput = {
       AND: [
         ...this.policy.portalVisibility(actor),
+        // `departmentId` is part of the shared public list query. It was
+        // accepted and silently discarded here while articles, events and
+        // policies honoured it, so the filter returned 200 and did nothing.
+        ...(query.departmentId ? [{ departmentId: query.departmentId }] : []),
         ...(query.q ? [{ OR: searchClause(query.q) }] : []),
       ],
     };
@@ -93,13 +103,14 @@ export class FaqsService {
     const departmentId =
       input.departmentId ?? (actor.scope === 'department' ? actor.departmentId : null);
     this.policy.assertCanWrite(actor, PERMISSIONS.create, departmentId);
+    await this.taxonomy.assertUsable(input.categoryId, TaxonomyKind.FAQ_CATEGORY);
     const status = this.policy.resolveInitialStatus(actor, input.status, PERMISSIONS.publish);
 
     const row = await this.prisma.faq.create({
       data: {
         question: input.question,
         answer: input.answer,
-        category: input.category,
+        categoryId: input.categoryId,
         position: input.position,
         departmentId,
         status,
@@ -122,6 +133,13 @@ export class FaqsService {
     if (input.departmentId !== undefined) {
       this.policy.assertCanWrite(actor, PERMISSIONS.update, input.departmentId ?? null);
     }
+    // The same check `create` makes. The foreign key only proves the id names
+    // some row in `taxonomies`; it cannot tell an FAQ category from a ticket
+    // category, and it does not know about archiving. Without this, a term that
+    // cannot be chosen on create is still applicable on edit.
+    if (input.categoryId !== undefined) {
+      await this.taxonomy.assertUsable(input.categoryId, TaxonomyKind.FAQ_CATEGORY);
+    }
     if (input.status) {
       this.policy.assertCanSetStatus(
         actor,
@@ -135,7 +153,7 @@ export class FaqsService {
       data: {
         ...(input.question !== undefined ? { question: input.question } : {}),
         ...(input.answer !== undefined ? { answer: input.answer } : {}),
-        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
         ...(input.position !== undefined ? { position: input.position } : {}),
         ...(input.departmentId !== undefined ? { departmentId: input.departmentId ?? null } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
@@ -208,7 +226,12 @@ export class FaqsService {
       id: row.id,
       question: row.question,
       answer: row.answer,
-      category: row.category,
+      category: {
+        id: row.category.id,
+        key: row.category.key,
+        label: row.category.label,
+        colour: row.category.colour,
+      },
       position: row.position,
       status: row.status as ContentStatus,
       department: row.department,
@@ -223,7 +246,7 @@ function searchClause(q: string): Prisma.FaqWhereInput[] {
   return [
     { question: { contains: q, mode } },
     { answer: { contains: q, mode } },
-    { category: { contains: q, mode } },
+    { category: { label: { contains: q, mode } } },
   ];
 }
 
@@ -231,7 +254,7 @@ function flatten(row: FaqRow): Record<string, unknown> {
   return {
     question: row.question,
     answer: row.answer,
-    category: row.category,
+    categoryId: row.categoryId,
     position: row.position,
     status: row.status,
     departmentId: row.departmentId,

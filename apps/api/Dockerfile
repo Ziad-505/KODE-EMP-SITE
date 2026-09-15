@@ -25,9 +25,15 @@ RUN pnpm --filter @kode/contracts build \
  && pnpm --filter @kode/api exec nest build
 
 # Prune to production dependencies for the runtime image.
+#
+# `cp -rT` (never treat the destination as a parent) rather than plain `cp -r`:
+# `pnpm deploy` already copies dist/ and prisma/ across, so the destinations
+# exist and plain `cp -r` nested each inside itself as dist/dist and
+# prisma/prisma. The image still ran, which is why it went unnoticed, but it
+# carried a full duplicate of the build.
 RUN pnpm --filter @kode/api --prod deploy /tmp/api-runtime \
- && cp -r apps/api/dist /tmp/api-runtime/dist \
- && cp -r apps/api/prisma /tmp/api-runtime/prisma
+ && cp -rT apps/api/dist /tmp/api-runtime/dist \
+ && cp -rT apps/api/prisma /tmp/api-runtime/prisma
 
 # ------------------------------------------------------------- runtime
 FROM node:22-bookworm-slim AS runtime

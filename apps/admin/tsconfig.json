@@ -3,7 +3,10 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    // "node" as well as "vite/client": this array replaces the default automatic
+    // inclusion of node_modules/@types, so omitting it leaves the `node:url`
+    // import in vite.config.ts unresolvable on a machine without a stray copy.
+    "types": ["vite/client", "node"],
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "baseUrl": ".",

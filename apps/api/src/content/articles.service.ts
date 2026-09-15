@@ -4,6 +4,8 @@ import {
   AuditAction,
   ContentStatus,
   Permission,
+  TaxonomyKind,
+  slugify,
   type AdminListQuery,
   type ArticleDto,
   type ChangeStatusInput,
@@ -15,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { MediaUrlService } from '../media/media-url.service';
+import { TaxonomyService } from '../taxonomy/taxonomy.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import {
   ContentPolicy,
@@ -33,7 +36,13 @@ const PERMISSIONS: ContentPermissionSet = {
   publish: Permission.NEWS_PUBLISH,
 };
 
+const CATEGORY_SELECT = { select: { id: true, key: true, label: true, colour: true } };
+
 const INCLUDE = {
+  // The term travels with the row so a list can render its label and colour
+  // without a second request, and so a frontend deployed before a category was
+  // created still renders it instead of printing a raw key.
+  category: CATEGORY_SELECT,
   coverMedia: { select: { storageKey: true } },
   department: { select: { id: true, name: true, colour: true } },
   author: { select: { id: true, firstName: true, lastName: true } },
@@ -48,6 +57,7 @@ export class ArticlesService {
     private readonly audit: AuditService,
     private readonly policy: ContentPolicy,
     private readonly urls: MediaUrlService,
+    private readonly taxonomy: TaxonomyService,
   ) {}
 
   /* ------------------------------- portal ------------------------------- */
@@ -129,6 +139,7 @@ export class ArticlesService {
     const departmentId = this.resolveDepartment(input.departmentId, actor);
     this.policy.assertCanWrite(actor, PERMISSIONS.create, departmentId);
 
+    await this.taxonomy.assertUsable(input.categoryId, TaxonomyKind.ARTICLE_CATEGORY);
     const status = this.policy.resolveInitialStatus(actor, input.status, PERMISSIONS.publish);
     const slug = await this.nextSlug(input.slug ?? input.title);
 
@@ -138,7 +149,7 @@ export class ArticlesService {
         title: input.title,
         excerpt: input.excerpt ?? null,
         body: input.body,
-        category: input.category,
+        categoryId: input.categoryId,
         pinned: input.pinned,
         status,
         coverMediaId: input.coverMediaId ?? null,
@@ -172,6 +183,14 @@ export class ArticlesService {
       this.policy.assertCanWrite(actor, PERMISSIONS.update, input.departmentId ?? null);
     }
 
+    // The same check `create` makes. The foreign key only proves the id names
+    // some row in `taxonomies`; it cannot tell a news category from a ticket
+    // category, and it does not know about archiving. Without this, a term that
+    // cannot be chosen on create is still applicable on edit.
+    if (input.categoryId !== undefined) {
+      await this.taxonomy.assertUsable(input.categoryId, TaxonomyKind.ARTICLE_CATEGORY);
+    }
+
     const nextStatus = input.status ?? (existing.status as ContentStatus);
     if (input.status) {
       this.policy.assertCanSetStatus(
@@ -189,7 +208,7 @@ export class ArticlesService {
         ...(input.slug !== undefined ? { slug: await this.nextSlug(input.slug, id) } : {}),
         ...(input.excerpt !== undefined ? { excerpt: input.excerpt ?? null } : {}),
         ...(input.body !== undefined ? { body: input.body } : {}),
-        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.coverMediaId !== undefined ? { coverMediaId: input.coverMediaId ?? null } : {}),
         ...(input.departmentId !== undefined ? { departmentId: input.departmentId ?? null } : {}),
@@ -293,9 +312,28 @@ export class ArticlesService {
     return actor.scope === 'department' ? actor.departmentId : null;
   }
 
+  /**
+   * Next free slug for this table.
+   *
+   * Two changes from the original. It filters on the slug prefix instead of
+   * loading every slug in the table into memory on each create, and it no
+   * longer excludes soft-deleted rows implicitly: a soft-deleted row still owns
+   * its slug at the database level (the unique index does not care about
+   * `deletedAt`), so pretending otherwise produced a P2002 on what looked like
+   * a free name.
+   *
+   * The check-then-insert is still not atomic — two editors publishing the same
+   * title in the same instant both compute the same candidate and the second
+   * gets a 409 from the unique index. That is the correct outcome, and the
+   * index is the real guarantee; this only makes the common case pleasant.
+   */
   private async nextSlug(desired: string, excludeId?: string): Promise<string> {
+    const base = slugify(desired) || 'item';
     const taken = await this.prisma.article.findMany({
-      where: excludeId ? { NOT: { id: excludeId } } : {},
+      where: {
+        slug: { startsWith: base },
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
       select: { slug: true },
     });
     return uniqueSlug(
@@ -311,7 +349,12 @@ export class ArticlesService {
       title: row.title,
       excerpt: row.excerpt,
       body: row.body,
-      category: row.category,
+      category: {
+        id: row.category.id,
+        key: row.category.key,
+        label: row.category.label,
+        colour: row.category.colour,
+      },
       pinned: row.pinned,
       status: row.status as ContentStatus,
       coverUrl: this.urls.toUrl(row.coverMedia?.storageKey),
@@ -335,7 +378,7 @@ function searchClause(q: string): Prisma.ArticleWhereInput[] {
     { title: { contains: q, mode } },
     { excerpt: { contains: q, mode } },
     { body: { contains: q, mode } },
-    { category: { contains: q, mode } },
+    { category: { label: { contains: q, mode } } },
   ];
 }
 
@@ -345,7 +388,7 @@ function flatten(row: ArticleRow): Record<string, unknown> {
     slug: row.slug,
     excerpt: row.excerpt,
     body: row.body,
-    category: row.category,
+    categoryId: row.categoryId,
     pinned: row.pinned,
     status: row.status,
     departmentId: row.departmentId,

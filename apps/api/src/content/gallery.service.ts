@@ -4,6 +4,7 @@ import {
   AuditAction,
   ContentStatus,
   Permission,
+  slugify,
   type AdminListQuery,
   type AlbumDto,
   type ChangeStatusInput,
@@ -59,6 +60,10 @@ export class GalleryService {
     const where: Prisma.GalleryAlbumWhereInput = {
       AND: [
         ...this.policy.portalVisibility(actor),
+        // `departmentId` is part of the shared public list query. It was
+        // accepted and silently discarded here while articles, events and
+        // policies honoured it, so the filter returned 200 and did nothing.
+        ...(query.departmentId ? [{ departmentId: query.departmentId }] : []),
         ...(query.q ? [{ OR: searchClause(query.q) }] : []),
       ],
     };
@@ -157,6 +162,17 @@ export class GalleryService {
       );
     }
 
+    /*
+     * The slug is resolved before the transaction opens, not inside it.
+     * `nextSlug` runs its own query on a different connection, so calling it
+     * from inside an interactive transaction held one connection while waiting
+     * for a second: with `DATABASE_POOL_SIZE=10` and ten concurrent album
+     * edits, every connection was held by a transaction waiting for an
+     * eleventh that would never come.
+     */
+    const nextSlugValue =
+      input.slug !== undefined ? await this.nextSlug(input.slug, id) : undefined;
+
     const row = await this.prisma.$transaction(async (tx) => {
       if (input.itemIds) {
         await tx.galleryItem.deleteMany({ where: { albumId: id } });
@@ -169,7 +185,7 @@ export class GalleryService {
         where: { id },
         data: {
           ...(input.title !== undefined ? { title: input.title } : {}),
-          ...(input.slug !== undefined ? { slug: await this.nextSlug(input.slug, id) } : {}),
+          ...(nextSlugValue !== undefined ? { slug: nextSlugValue } : {}),
           ...(input.description !== undefined ? { description: input.description ?? null } : {}),
           ...(input.coverMediaId !== undefined ? { coverMediaId: input.coverMediaId ?? null } : {}),
           ...(input.takenOn !== undefined ? { takenOn: input.takenOn ?? null } : {}),
@@ -240,9 +256,28 @@ export class GalleryService {
     return row;
   }
 
+  /**
+   * Next free slug for this table.
+   *
+   * Two changes from the original. It filters on the slug prefix instead of
+   * loading every slug in the table into memory on each create, and it no
+   * longer excludes soft-deleted rows implicitly: a soft-deleted row still owns
+   * its slug at the database level (the unique index does not care about
+   * `deletedAt`), so pretending otherwise produced a P2002 on what looked like
+   * a free name.
+   *
+   * The check-then-insert is still not atomic — two editors publishing the same
+   * title in the same instant both compute the same candidate and the second
+   * gets a 409 from the unique index. That is the correct outcome, and the
+   * index is the real guarantee; this only makes the common case pleasant.
+   */
   private async nextSlug(desired: string, excludeId?: string): Promise<string> {
+    const base = slugify(desired) || 'item';
     const taken = await this.prisma.galleryAlbum.findMany({
-      where: excludeId ? { NOT: { id: excludeId } } : {},
+      where: {
+        slug: { startsWith: base },
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
       select: { slug: true },
     });
     return uniqueSlug(

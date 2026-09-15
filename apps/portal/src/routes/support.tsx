@@ -1,22 +1,22 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
-  ALL_TICKET_CATEGORIES,
   ALL_TICKET_PRIORITIES,
-  TicketCategory,
+  TaxonomyKind,
   TicketPriority,
   createTicketSchema,
 } from '@kode/contracts';
 import { ApiError } from '../lib/api-client';
-import { useCreateTicket, useMyTickets } from '../lib/queries';
+import { useCreateTicket, useMyTickets, useTaxonomy } from '../lib/queries';
 import { Icon } from '../components/icon';
 import { InnerBanner, formatDate } from './shared';
 
+/**
+ * Priorities only. Ticket categories moved to the admin-managed taxonomy table,
+ * so their labels arrive from the API and IT can add one without a deploy.
+ * Priority stays fixed because it is an escalation scale the routing rules
+ * depend on, not an editorial list.
+ */
 const LABEL: Record<string, string> = {
-  HARDWARE: 'Hardware',
-  SOFTWARE: 'Software',
-  NETWORK: 'Network or Wi-Fi',
-  ACCESS: 'Accounts and access',
-  OTHER: 'Something else',
   LOW: 'Low',
   NORMAL: 'Normal',
   HIGH: 'High',
@@ -26,15 +26,22 @@ const LABEL: Record<string, string> = {
 export function SupportPage() {
   const createTicket = useCreateTicket();
   const { data: tickets } = useMyTickets();
+  const { data: categories } = useTaxonomy(TaxonomyKind.TICKET_CATEGORY);
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [location, setLocation] = useState('');
-  const [category, setCategory] = useState<TicketCategory>(TicketCategory.OTHER);
+  // Empty until the terms load, then defaulted to the first. The form's submit
+  // is disabled while it is empty rather than guessing an id.
+  const [categoryId, setCategoryId] = useState('');
   const [priority, setPriority] = useState<TicketPriority>(TicketPriority.NORMAL);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [reference, setReference] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!categoryId && categories?.length) setCategoryId(categories[0]!.id);
+  }, [categories, categoryId]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -44,7 +51,7 @@ export function SupportPage() {
     const parsed = createTicketSchema.safeParse({
       subject,
       body,
-      category,
+      categoryId,
       priority,
       location: location || null,
       attachmentIds: [],
@@ -131,16 +138,18 @@ export function SupportPage() {
             <label data-reveal="field">
               CATEGORY
               <select
-                value={category}
-                onChange={(event) => setCategory(event.target.value as TicketCategory)}
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                aria-invalid={Boolean(errors.categoryId)}
               >
-                {ALL_TICKET_CATEGORIES.map((value) => (
-                  <option key={value} value={value}>
-                    {LABEL[value]}
+                {(categories ?? []).map((term) => (
+                  <option key={term.id} value={term.id}>
+                    {term.label}
                   </option>
                 ))}
               </select>
             </label>
+            {errors.categoryId ? <span className="field-error">{errors.categoryId}</span> : null}
 
             <label data-reveal="field">
               PRIORITY
@@ -178,9 +187,21 @@ export function SupportPage() {
             </label>
             {errors.body ? <span className="field-error">{errors.body}</span> : null}
 
-            <button className="ink-button" type="submit" disabled={createTicket.isPending}>
+            {/* Disabled until the categories arrive. Submitting without one
+                fails validation on a field the form cannot show an error
+                against, so the button would appear to do nothing at all. */}
+            <button
+              className="ink-button"
+              type="submit"
+              disabled={createTicket.isPending || !categoryId}
+            >
               {createTicket.isPending ? 'SENDING...' : 'SEND TO IT'} <Icon name="arrow" />
             </button>
+            {!categoryId ? (
+              <span className="field-error">
+                Loading the request types. If this does not clear, reload the page.
+              </span>
+            ) : null}
           </div>
         </div>
       </form>
@@ -198,7 +219,7 @@ export function SupportPage() {
                 <div>
                   <b>{ticket.subject}</b>
                   <small>
-                    {ticket.reference} · {formatDate(ticket.createdAt)} · {LABEL[ticket.category]}
+                    {ticket.reference} · {formatDate(ticket.createdAt)} · {ticket.category.label}
                   </small>
                 </div>
                 <span className="status-chip" data-status={ticket.status}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   CONTENT_STATUS_LABEL,
@@ -39,10 +39,16 @@ export function ContentEditorPage() {
 
   const existing = useContentItem<Draft>(resource!, isNew ? undefined : id);
   const departments = useDepartments();
-  // Only fetched for the events editor. Archived terms are excluded: they stay
-  // valid on events that already use them but cannot be chosen for new ones.
+  // Archived terms are excluded: they stay valid on items that already use them
+  // but cannot be chosen for new ones. All three lists are cached for five
+  // minutes and read on nearly every editor screen, so fetching them together
+  // costs one request each per session rather than one per resource type.
   const eventKinds = useTaxonomy(TaxonomyKind.EVENT_KIND).data;
+  const newsCategories = useTaxonomy(TaxonomyKind.ARTICLE_CATEGORY).data;
+  const faqCategories = useTaxonomy(TaxonomyKind.FAQ_CATEGORY).data;
   const defaultKindId = eventKinds?.[0]?.id ?? '';
+  const defaultNewsCategoryId = newsCategories?.[0]?.id ?? '';
+  const defaultFaqCategoryId = faqCategories?.[0]?.id ?? '';
   const save = useSaveContent<Draft>(resource!);
 
   const [draft, setDraft] = useState<Draft>({});
@@ -50,29 +56,66 @@ export function ContentEditorPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  /*
+   * Which blank form the draft was seeded for, so seeding happens exactly once
+   * per form rather than on every render of this effect.
+   *
+   * The term lists resolve after the first render, so the default ids they
+   * produce change from '' to a real id partway through editing. When those ids
+   * were effect dependencies, that change re-ran the whole seed and
+   * `setDraft({...})` replaced everything already typed — a headline written
+   * before the third query landed simply vanished, with nothing on screen to
+   * say why. Switching resource type still re-seeds, because the key changes.
+   */
+  const seededFor = useRef<string | null>(null);
+
   useEffect(() => {
     if (!isNew && existing.data) {
+      seededFor.current = null;
       setDraft({
         ...existing.data,
         departmentId: (existing.data.department as { id: string } | null)?.id ?? null,
         // The DTO carries the whole term so lists can render its label and
         // colour; the form edits the id.
         ...(existing.data.kind ? { kindId: (existing.data.kind as { id: string }).id } : {}),
+        ...(existing.data.category
+          ? { categoryId: (existing.data.category as { id: string }).id }
+          : {}),
       });
     }
-    if (isNew) {
+    if (isNew && seededFor.current !== resourceKey) {
+      seededFor.current = resourceKey;
       setDraft({
         status: ContentStatus.DRAFT,
         // A department-scoped editor cannot create club-wide content, so their
         // own department is pre-selected rather than left blank and rejected.
         departmentId: user?.role === 'DEPARTMENT_EDITOR' ? user.departmentId : null,
-        ...(resourceKey === 'events' ? { kindId: defaultKindId } : {}),
         ...(resourceKey === 'policies' ? { version: '1.0' } : {}),
-        ...(resourceKey === 'news' ? { category: 'Club life', pinned: false } : {}),
-        ...(resourceKey === 'faqs' ? { category: 'Workplace', position: 0 } : {}),
+        ...(resourceKey === 'news' ? { pinned: false } : {}),
+        ...(resourceKey === 'faqs' ? { position: 0 } : {}),
       });
     }
-  }, [isNew, existing.data, resourceKey, user, defaultKindId]);
+  }, [isNew, existing.data, resourceKey, user]);
+
+  /*
+   * The default term, applied only while the field is still empty. Separated
+   * from the seed above so a slow response fills a blank select instead of
+   * discarding the rest of the form.
+   */
+  useEffect(() => {
+    if (!isNew) return;
+    const field = resourceKey === 'events' ? 'kindId' : 'categoryId';
+    const fallback =
+      resourceKey === 'events'
+        ? defaultKindId
+        : resourceKey === 'news'
+          ? defaultNewsCategoryId
+          : resourceKey === 'faqs'
+            ? defaultFaqCategoryId
+            : '';
+    if (!fallback) return;
+    setDraft((current) => (current[field] ? current : { ...current, [field]: fallback }));
+  }, [isNew, resourceKey, defaultKindId, defaultNewsCategoryId, defaultFaqCategoryId]);
 
   const currentStatus = (draft.status as ContentStatus) ?? ContentStatus.DRAFT;
   const canPublish = resource ? can(resource.permissions.publish) : false;
@@ -308,11 +351,20 @@ export function ContentEditorPage() {
 
           {resourceKey === 'news' ? (
             <>
-              <Field label="CATEGORY" error={errors.category}>
-                <input
-                  value={str(draft.category)}
-                  onChange={(event) => set('category', event.target.value)}
-                />
+              <Field label="CATEGORY" error={errors.categoryId}>
+                {/* A managed list, not free text. The column used to be an
+                    unconstrained string, so "Club Life" and "club life"
+                    existed as separate facets with no way to rename either. */}
+                <select
+                  value={str(draft.categoryId)}
+                  onChange={(event) => set('categoryId', event.target.value)}
+                >
+                  {(newsCategories ?? []).map((term) => (
+                    <option key={term.id} value={term.id}>
+                      {term.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <label
                 className="cms-field"
@@ -412,11 +464,20 @@ export function ContentEditorPage() {
 
           {resourceKey === 'faqs' ? (
             <>
-              <Field label="CATEGORY" error={errors.category}>
-                <input
-                  value={str(draft.category)}
-                  onChange={(event) => set('category', event.target.value)}
-                />
+              <Field label="CATEGORY" error={errors.categoryId}>
+                {/* A managed list, not free text. The column used to be an
+                    unconstrained string, so "Club Life" and "club life"
+                    existed as separate facets with no way to rename either. */}
+                <select
+                  value={str(draft.categoryId)}
+                  onChange={(event) => set('categoryId', event.target.value)}
+                >
+                  {(faqCategories ?? []).map((term) => (
+                    <option key={term.id} value={term.id}>
+                      {term.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="ORDER" error={errors.position} hint="Lower numbers appear first.">
                 <input
