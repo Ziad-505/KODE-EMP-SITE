@@ -16,11 +16,20 @@ import { ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   changePasswordSchema,
+  confirmTotpSchema,
+  disableTotpSchema,
   loginSchema,
+  totpChallengeSchema,
   type ChangePasswordInput,
+  type ConfirmTotpInput,
+  type DisableTotpInput,
   type LoginInput,
   type LoginResponse,
   type SessionUser,
+  type SignInResult,
+  type TotpChallengeInput,
+  type TotpEnrolmentDto,
+  type TotpStatusDto,
 } from '@kode/contracts';
 import type { Request, Response } from 'express';
 import { ZodBody } from '../common/zod-validation.pipe';
@@ -29,6 +38,7 @@ import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { AuthService } from './auth.service';
 import { EntraService } from './entra.service';
+import { TotpService } from './totp.service';
 import { TokenService } from './token.service';
 import { CurrentUser, Public } from './auth.decorators';
 import { SkipCsrf } from './csrf.decorator';
@@ -42,6 +52,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly entra: EntraService,
     private readonly tokens: TokenService,
+    private readonly totp: TotpService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -69,10 +80,74 @@ export class AuthController {
   async login(
     @Body(ZodBody(loginSchema)) input: LoginInput,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<LoginResponse> {
-    const { tokens, user } = await this.auth.login(input, this.context());
+  ): Promise<SignInResult> {
+    const outcome = await this.auth.login(input, this.context());
+
+    // Two shapes, and no cookies on the challenge path: until the second factor
+    // is proved there is no session to put in one.
+    if ('mfaRequired' in outcome) return outcome;
+
+    setAuthCookies(response, this.env, outcome.tokens);
+    return { user: outcome.user, expiresIn: outcome.tokens.expiresIn };
+  }
+
+  @Public()
+  @SkipCsrf()
+  @Throttle({ auth: {} })
+  @Post('login/totp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Finish a sign-in that stopped at the second factor' })
+  async loginTotp(
+    @Body(ZodBody(totpChallengeSchema)) input: TotpChallengeInput,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LoginResponse & { usedRecoveryCode: boolean }> {
+    const { tokens, user, usedRecoveryCode } = await this.auth.completeTotpLogin(
+      input.challengeToken,
+      input.code,
+      this.context(),
+    );
     setAuthCookies(response, this.env, tokens);
-    return { user, expiresIn: tokens.expiresIn };
+    return { user, expiresIn: tokens.expiresIn, usedRecoveryCode };
+  }
+
+  /* --------------------------------------------- managing your own factor */
+
+  @Get('2fa')
+  @ApiOperation({ summary: 'Whether this account needs, and has, a second factor' })
+  totpStatus(@CurrentUser() actor: AuthenticatedUser): Promise<TotpStatusDto> {
+    return this.totp.statusFor(actor.id);
+  }
+
+  /**
+   * Returns the secret and the recovery codes exactly once. Nothing stores the
+   * codes in readable form, so a lost sheet means generating new ones rather
+   * than looking the old ones up.
+   */
+  @Post('2fa/setup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Begin enrolling an authenticator app' })
+  beginTotp(@CurrentUser() actor: AuthenticatedUser): Promise<TotpEnrolmentDto> {
+    return this.totp.beginEnrolment(actor.id, actor.email);
+  }
+
+  @Post('2fa/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Prove the authenticator works, switching the factor on' })
+  async confirmTotp(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body(ZodBody(confirmTotpSchema)) input: ConfirmTotpInput,
+  ): Promise<void> {
+    await this.totp.confirmEnrolment(actor.id, input.code);
+  }
+
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Turn the second factor off, re-checking the password' })
+  async disableTotp(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body(ZodBody(disableTotpSchema)) input: DisableTotpInput,
+  ): Promise<void> {
+    await this.totp.disable(actor.id, input.password);
   }
 
   @Public()

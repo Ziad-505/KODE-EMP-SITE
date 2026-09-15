@@ -2533,3 +2533,143 @@ a {
     align-items: end;
   }
 }
+
+/* ---------------------------------------------- your sign-in (2FA) ------ */
+
+.security-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.security-card {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.security-card p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.security-step {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.security-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.security-status b {
+  display: block;
+  font-size: 14px;
+}
+
+.security-status small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* On/off rather than a colour alone, so the state survives a monochrome
+   screen and a colour-blind reader. */
+.security-flag {
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.security-flag[data-on='true'] {
+  border-color: #187339;
+  color: #187339;
+}
+
+.security-flag[data-on='false'] {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+/* Monospace and tabular: these are transcribed by hand off a screen or a
+   printout, where a lowercase l and a 1 looking alike costs a support call. */
+.recovery-codes {
+  list-style: none;
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  background: var(--bg);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 18px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.security-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 36px;
+}
+
+.security-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.totp-enrol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.totp-enrol img {
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 8px;
+  max-width: 100%;
+  height: auto;
+}
+
+.totp-enrol > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.totp-secret {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  background: var(--bg);
+}
+
+@media (max-width: 640px) {
+  .security-card {
+    padding: 16px;
+  }
+
+  .recovery-codes {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

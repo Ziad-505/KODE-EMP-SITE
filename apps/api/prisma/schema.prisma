@@ -87,6 +87,22 @@ model User {
   lockedUntil      DateTime?
   lastLoginAt      DateTime?
 
+  /**
+   * Time-based one-time password, required for anyone who can reach the CMS.
+   * `totpSecret` is the base32 shared secret and exists from the moment
+   * enrolment starts. `totpConfirmedAt` is what actually counts: it is set only
+   * once the person has typed a valid code, proving the authenticator app is
+   * working before they are locked into needing it. A secret with no
+   * confirmation is an abandoned enrolment and is simply overwritten by the
+   * next attempt.
+   * `totpRecoveryCodes` holds Argon2 hashes, never the codes themselves — they
+   * are shown once at enrolment and are the only way back in from a lost phone.
+   * Each is single-use: consuming one removes it from the array.
+   */
+  totpSecret        String?
+  totpConfirmedAt   DateTime?
+  totpRecoveryCodes String[]  @default([])
+
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
@@ -568,5 +584,3 @@ model AuditLog {
   @@index([action])
   @@map("audit_logs")
 }
-
-

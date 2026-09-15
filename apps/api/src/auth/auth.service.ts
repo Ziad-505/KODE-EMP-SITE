@@ -19,13 +19,29 @@ import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { MediaUrlService } from '../media/media-url.service';
+import { JwtService } from '@nestjs/jwt';
 import { PasswordService } from './password.service';
+import { TotpService } from './totp.service';
 import { TokenService, type IssuedTokens } from './token.service';
 
 export interface AuthContext {
   ipAddress: string | null;
   userAgent: string | null;
 }
+
+/**
+ * How long the half-finished sign-in stays valid.
+ *
+ * Long enough to open an authenticator app and read a code that may be about to
+ * roll over; short enough that a challenge token lifted from a log or a shared
+ * screen is worthless by the time anyone looks at it.
+ */
+const MFA_CHALLENGE_TTL_SECONDS = 180;
+
+/** The result of a password sign-in: either a session, or a second factor. */
+export type LoginOutcome =
+  | { tokens: IssuedTokens; user: SessionUser }
+  | { mfaRequired: true; challengeToken: string; expiresIn: number };
 
 @Injectable()
 export class AuthService {
@@ -37,13 +53,12 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
     private readonly mediaUrls: MediaUrlService,
+    private readonly totp: TotpService,
+    private readonly jwt: JwtService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
-  async login(
-    input: LoginInput,
-    context: AuthContext,
-  ): Promise<{ tokens: IssuedTokens; user: SessionUser }> {
+  async login(input: LoginInput, context: AuthContext): Promise<LoginOutcome> {
     const user = await this.prisma.user.findFirst({
       where: { email: input.email, deletedAt: null },
       include: { department: true, avatarMedia: true },
@@ -79,6 +94,29 @@ export class AuthService {
       throw new ForbiddenException('This account has been suspended.');
     }
 
+    /*
+     * Password accepted. If this account carries a confirmed second factor, the
+     * sign-in stops here and no session is issued — the caller gets a
+     * short-lived challenge instead, and exchanges it for a session by proving
+     * the second factor at `completeTotpLogin`.
+     *
+     * The failed-attempt counter is reset first, deliberately. The password was
+     * correct; holding the lockout against them because they then fumbled a
+     * six-digit code would lock people out of their own accounts for a reason
+     * that has nothing to do with an attacker.
+     */
+    if (user.totpSecret && user.totpConfirmedAt) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginCount: 0, lockedUntil: null },
+      });
+      return {
+        mfaRequired: true as const,
+        challengeToken: await this.issueMfaChallenge(user.id),
+        expiresIn: MFA_CHALLENGE_TTL_SECONDS,
+      };
+    }
+
     // Transparently upgrade the hash if the cost parameters have moved on.
     const patch: Record<string, unknown> = {
       failedLoginCount: 0,
@@ -111,6 +149,90 @@ export class AuthService {
     });
 
     return { tokens, user: this.toSessionUser(user) };
+  }
+
+  /**
+   * The second half of a two-factor sign-in.
+   *
+   * The challenge token proves only that a password was accepted moments ago
+   * for a specific account. It is signed with its own `typ`, so the JWT guard
+   * rejects it as an access token — a half-finished sign-in cannot be used to
+   * read anything.
+   */
+  async completeTotpLogin(
+    challengeToken: string,
+    code: string,
+    context: AuthContext,
+  ): Promise<{ tokens: IssuedTokens; user: SessionUser; usedRecoveryCode: boolean }> {
+    let userId: string;
+    try {
+      const payload = await this.jwt.verifyAsync<{ sub: string; typ: string }>(challengeToken, {
+        secret: this.env.JWT_ACCESS_SECRET,
+      });
+      if (payload.typ !== 'mfa') throw new Error('wrong token type');
+      userId = payload.sub;
+    } catch {
+      throw new UnauthorizedException('That sign-in attempt has expired. Please start again.');
+    }
+
+    const kind = await this.totp.verifyForSignIn(userId, code);
+
+    const user = await this.prisma.user.findFirstOrThrow({
+      where: { id: userId, deletedAt: null },
+      include: { department: true, avatarMedia: true },
+    });
+
+    // Re-checked after the second factor, not only before it: an account
+    // suspended during the seconds between the two steps must not get in.
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new ForbiddenException('This account has been suspended.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+        ...(user.status === UserStatus.INVITED ? { status: UserStatus.ACTIVE } : {}),
+      },
+    });
+
+    const tokens = await this.tokens.issueSession(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role as Role,
+        departmentId: user.departmentId,
+        extraPermissions: user.extraPermissions as Permission[],
+      },
+      context,
+    );
+
+    await this.audit.record({
+      action: AuditAction.LOGIN,
+      entityType: 'User',
+      entityId: user.id,
+      // The audit trail distinguishes the two, because a recovery code means
+      // somebody has lost their phone — or somebody else has found it.
+      summary:
+        kind === 'recovery'
+          ? `${user.firstName} ${user.lastName} signed in using a recovery code`
+          : `${user.firstName} ${user.lastName} signed in with a password and a second factor`,
+      actorId: user.id,
+    });
+
+    return {
+      tokens,
+      user: this.toSessionUser(user),
+      usedRecoveryCode: kind === 'recovery',
+    };
+  }
+
+  /** Signs the short-lived token that stands in for a half-finished sign-in. */
+  private async issueMfaChallenge(userId: string): Promise<string> {
+    return this.jwt.signAsync(
+      { sub: userId, typ: 'mfa' },
+      { secret: this.env.JWT_ACCESS_SECRET, expiresIn: MFA_CHALLENGE_TTL_SECONDS },
+    );
   }
 
   async refresh(rawToken: string, context: AuthContext): Promise<IssuedTokens> {

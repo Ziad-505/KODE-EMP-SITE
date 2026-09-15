@@ -16,6 +16,7 @@ import { MediaPage } from './routes/media';
 import { PeoplePage } from './routes/people';
 import { AuditPage } from './routes/audit';
 import { TaxonomyPage } from './routes/taxonomy';
+import { SecurityPage } from './routes/security';
 import { AccessPage } from './routes/access';
 import { LinksPage } from './routes/links';
 import { CmsNotFoundPage } from './routes/not-found';
@@ -93,6 +94,16 @@ createRoot(document.getElementById('root')!).render(
                 element={
                   <RequireCms permission={Permission.CMS_ACCESS}>
                     <TaxonomyPage />
+                  </RequireCms>
+                }
+              />
+              {/* Your own account, so the only gate is being able to reach the
+                  CMS at all — not a management permission. */}
+              <Route
+                path="/security"
+                element={
+                  <RequireCms permission={Permission.CMS_ACCESS}>
+                    <SecurityPage />
                   </RequireCms>
                 }
               />

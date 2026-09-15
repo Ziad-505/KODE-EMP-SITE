@@ -53,3 +53,92 @@ export interface LoginResponse {
   /** Seconds until the access token expires. The refresh happens via cookie. */
   expiresIn: number;
 }
+
+/* ------------------------------------------------------- two-factor (TOTP) */
+
+/**
+ * Six digits, as every authenticator app produces. Kept as a string rather than
+ * a number so a leading zero survives — `092431` is a valid code and
+ * `Number('092431')` is not.
+ */
+export const totpCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, 'Enter the six-digit code from your authenticator app');
+
+/**
+ * A recovery code as it is shown to the user: five groups of four, lowercase
+ * alphanumeric. Accepted with or without the dashes, because people retype them
+ * from paper.
+ */
+export const recoveryCodeSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((value) => value.replace(/[^a-z0-9]/g, ''))
+  .refine((value) => value.length === 20, 'That does not look like a recovery code');
+
+export const confirmTotpSchema = z.object({ code: totpCodeSchema });
+export type ConfirmTotpInput = z.infer<typeof confirmTotpSchema>;
+
+/**
+ * Completing a sign-in that stopped at the second factor. The challenge token
+ * identifies which sign-in, and is useless for anything else.
+ */
+export const totpChallengeSchema = z.object({
+  challengeToken: z.string().min(10).max(4096),
+  code: z.union([totpCodeSchema, recoveryCodeSchema]),
+});
+export type TotpChallengeInput = z.infer<typeof totpChallengeSchema>;
+
+export const disableTotpSchema = z.object({
+  /** Re-authentication. Turning the second factor off is a privileged act. */
+  password: z.string().min(1).max(128),
+});
+export type DisableTotpInput = z.infer<typeof disableTotpSchema>;
+
+/** What `POST /auth/sign-in` returns when a second factor is still required. */
+export interface TotpChallengeResponse {
+  mfaRequired: true;
+  challengeToken: string;
+  /** Seconds before the challenge expires and sign-in must start again. */
+  expiresIn: number;
+}
+
+export interface TotpEnrolmentDto {
+  /** Base32, for people whose authenticator cannot scan a QR code. */
+  secret: string;
+  /** `otpauth://` URI. Carries the secret, so it never leaves the browser. */
+  uri: string;
+  /**
+   * The QR code as a `data:image/png;base64,...` URI, rendered on the server.
+   *
+   * Deliberately not a link to a QR-generating service: the URI it encodes
+   * *is* the shared secret, so handing it to a third party would give that
+   * party everything needed to generate valid codes. A data URI also satisfies
+   * the `img-src 'self' data:` content security policy, where a remote image
+   * would simply be blocked.
+   */
+  qrDataUri: string;
+  /** Shown once, never retrievable again. */
+  recoveryCodes: string[];
+}
+
+export interface TotpStatusDto {
+  /** True for anyone whose role can reach the CMS. */
+  required: boolean;
+  /** True once a valid code has proved the authenticator works. */
+  enrolled: boolean;
+  /** How many single-use recovery codes remain. */
+  recoveryCodesRemaining: number;
+}
+
+/**
+ * A sign-in response is one of two shapes, and the client must look before it
+ * leaps: a completed session, or a challenge that needs a code.
+ */
+export type SignInResult = LoginResponse | TotpChallengeResponse;
+
+export function isTotpChallenge(result: SignInResult): result is TotpChallengeResponse {
+  return (result as TotpChallengeResponse).mfaRequired === true;
+}

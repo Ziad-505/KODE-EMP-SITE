@@ -36,6 +36,9 @@ const NAVIGATION: NavEntry[] = [
   // Readable by any CMS user, because every editor needs to see the option
   // names. The API refuses writes without settings:manage.
   { label: 'Lists', to: '/lists', icon: 'settings', permission: Permission.CMS_ACCESS },
+  // Your own sign-in, not an administrative screen: nobody can enrol or remove
+  // a second factor on someone else's behalf.
+  { label: 'Your sign-in', to: '/security', icon: 'settings', permission: Permission.CMS_ACCESS },
   {
     label: 'System access',
     to: '/access',

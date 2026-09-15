@@ -4,17 +4,32 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
-import type { LoginInput, LoginResponse, Permission, SessionUser } from '@kode/contracts';
+import { isTotpChallenge } from '@kode/contracts';
+import type {
+  LoginInput,
+  LoginResponse,
+  Permission,
+  SessionUser,
+  SignInResult,
+} from '@kode/contracts';
 import { ApiError, api, onSessionExpired } from './api-client';
 
 interface AuthState {
   user: SessionUser | null;
   status: 'loading' | 'authenticated' | 'anonymous';
   providers: { local: boolean; entra: boolean };
-  signIn: (input: LoginInput) => Promise<void>;
+  /**
+   * Resolves to `'done'` when a session was issued, or `'mfa'` when the account
+   * carries a second factor and the caller must now collect a code and call
+   * `completeTotp`. Returning a discriminator rather than throwing keeps the
+   * two outcomes on the same footing: neither is an error.
+   */
+  signIn: (input: LoginInput) => Promise<'done' | 'mfa'>;
+  completeTotp: (code: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
   can: (permission: Permission) => boolean;
@@ -62,8 +77,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const signIn = useCallback(async (input: LoginInput) => {
-    const result = await api.post<LoginResponse>('/auth/login', input);
+  /*
+   * The challenge token is held in a ref rather than state: it is a credential
+   * in flight, it must not trigger a re-render, and it must not survive a
+   * reload. It lives for the three minutes the API allows and no longer.
+   */
+  const challengeToken = useRef<string | null>(null);
+
+  const signIn = useCallback(async (input: LoginInput): Promise<'done' | 'mfa'> => {
+    const result = await api.post<SignInResult>('/auth/login', input);
+
+    if (isTotpChallenge(result)) {
+      challengeToken.current = result.challengeToken;
+      return 'mfa';
+    }
+
+    challengeToken.current = null;
+    setUser(result.user);
+    setStatus('authenticated');
+    return 'done';
+  }, []);
+
+  const completeTotp = useCallback(async (code: string) => {
+    if (!challengeToken.current) {
+      throw new ApiError(401, 'That sign-in attempt has expired. Please start again.');
+    }
+    const result = await api.post<LoginResponse>('/auth/login/totp', {
+      challengeToken: challengeToken.current,
+      code,
+    });
+    challengeToken.current = null;
     setUser(result.user);
     setStatus('authenticated');
   }, []);
@@ -83,11 +126,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       providers,
       signIn,
+      completeTotp,
       signOut,
       refresh: load,
       can: (permission) => user?.permissions.includes(permission) ?? false,
     }),
-    [user, status, providers, signIn, signOut, load],
+    [user, status, providers, signIn, completeTotp, signOut, load],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
