@@ -21,3 +21,13 @@ backups/
 apps/api/prisma/*.db
 playwright-report/
 test-results/
+
+# Working archives and scratch copies. These were tracked once — seven build
+# zips and a stray lockfile, most of the repository's object size — and carry no
+# information the git history does not already hold.
+_to_delete/
+
+# A standalone copy of the portal for design review, with its own toolchain and
+# its own node_modules. Already excluded from lint and Prettier; it is not part
+# of the deployable workspace and must not become a second, divergent front end.
+prototype/

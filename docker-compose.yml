@@ -107,6 +107,9 @@ services:
       PORTAL_DOMAIN: ${PORTAL_DOMAIN}
       ADMIN_DOMAIN: ${ADMIN_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+      # Defaults to the ACME email, i.e. public certificates, unchanged. Set
+      # TLS_MODE=internal in .env for a VM the internet cannot reach.
+      TLS_MODE: ${TLS_MODE:-${ACME_EMAIL}}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

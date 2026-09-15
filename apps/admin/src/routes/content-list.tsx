@@ -298,7 +298,7 @@ function formatShort(value: string): string {
 
 function describe(row: ContentRow): string {
   const parts: string[] = [];
-  if (row.category) parts.push(row.category);
+  if (row.category) parts.push(String((row.category as { label?: string }).label ?? ''));
   if (row.version) parts.push(`v${row.version}`);
   if (row.startsAt)
     parts.push(

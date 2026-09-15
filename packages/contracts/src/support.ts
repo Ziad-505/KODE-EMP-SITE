@@ -1,11 +1,12 @@
+import type { TaxonomyRefDto } from './taxonomy';
 import { z } from 'zod';
-import { TicketCategory, TicketPriority, TicketStatus } from './enums';
+import { TicketPriority, TicketStatus } from './enums';
 import { paginationQuerySchema, cuidSchema } from './common';
 
 export const createTicketSchema = z.object({
   subject: z.string().trim().min(4, 'Give the request a short subject').max(160),
   body: z.string().trim().min(10, 'Tell IT what happened, where and when').max(4000),
-  category: z.nativeEnum(TicketCategory).default(TicketCategory.OTHER),
+  categoryId: cuidSchema,
   priority: z.nativeEnum(TicketPriority).default(TicketPriority.NORMAL),
   location: z.string().trim().max(160).nullish(),
   attachmentIds: z.array(cuidSchema).max(5).default([]),
@@ -33,7 +34,7 @@ export interface TicketDto {
   reference: string;
   subject: string;
   body: string;
-  category: TicketCategory;
+  category: TaxonomyRefDto;
   priority: TicketPriority;
   status: TicketStatus;
   location: string | null;

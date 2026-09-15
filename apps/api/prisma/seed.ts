@@ -68,6 +68,72 @@ async function main(): Promise<void> {
     departments.set(department.name, row.id);
   }
 
+  /* ------------------------------------------------- admin-managed terms */
+  /*
+   * Event kinds are rows now, not enum members, so the seed installs them the
+   * same way it installs departments. `isSystem` marks them as built in: the
+   * CMS will let an admin rename, recolour, reorder or archive them, but never
+   * delete them, so the create form's required select cannot be emptied.
+   */
+  const eventKinds = [
+    { key: 'CLUB_MOMENT', label: 'Club moment', colour: '#244EA2', sortOrder: 10 },
+    { key: 'LEARNING', label: 'Learning', colour: '#BFD730', sortOrder: 20 },
+    { key: 'WELLBEING', label: 'Wellbeing', colour: '#7F3F98', sortOrder: 30 },
+    { key: 'ANNOUNCEMENT', label: 'Announcement', colour: '#F26522', sortOrder: 40 },
+  ];
+
+  /**
+   * All four namespaces are installed the same way, because they are the same
+   * model now: event kinds, news categories, FAQ categories and support
+   * categories were previously two Postgres enums and two free-text columns.
+   */
+  const articleCategories = [
+    { key: 'CLUB_LIFE', label: 'Club life', colour: '#244EA2', sortOrder: 10 },
+    { key: 'PEOPLE', label: 'People', colour: '#ED0C6E', sortOrder: 20 },
+    { key: 'OPERATIONS', label: 'Operations', colour: '#F26522', sortOrder: 30 },
+    { key: 'FACILITIES', label: 'Facilities', colour: '#7F3F98', sortOrder: 40 },
+  ];
+  const faqCategories = [
+    { key: 'WORKPLACE', label: 'Workplace', colour: '#244EA2', sortOrder: 10 },
+    { key: 'IT_SUPPORT', label: 'IT support', colour: '#F26522', sortOrder: 20 },
+    { key: 'HEALTH_AND_SAFETY', label: 'Health and safety', colour: '#BFD730', sortOrder: 30 },
+  ];
+  const ticketCategories = [
+    { key: 'HARDWARE', label: 'Hardware', colour: '#F26522', sortOrder: 10 },
+    { key: 'SOFTWARE', label: 'Software', colour: '#244EA2', sortOrder: 20 },
+    { key: 'NETWORK', label: 'Network', colour: '#BFD730', sortOrder: 30 },
+    { key: 'ACCESS', label: 'Access and logins', colour: '#7F3F98', sortOrder: 40 },
+    { key: 'OTHER', label: 'Something else', colour: '#15162B', sortOrder: 50 },
+  ];
+
+  async function installTerms(
+    kind: 'EVENT_KIND' | 'ARTICLE_CATEGORY' | 'FAQ_CATEGORY' | 'TICKET_CATEGORY',
+    terms: { key: string; label: string; colour: string; sortOrder: number }[],
+  ): Promise<Map<string, string>> {
+    const byKey = new Map<string, string>();
+    for (const term of terms) {
+      const row = await prisma.taxonomy.upsert({
+        where: { kind_key: { kind, key: term.key } },
+        update: { label: term.label, colour: term.colour, sortOrder: term.sortOrder },
+        create: { kind, isSystem: true, ...term },
+      });
+      byKey.set(term.key, row.id);
+    }
+    return byKey;
+  }
+
+  const kindByKey = await installTerms('EVENT_KIND', eventKinds);
+  const articleCatByKey = await installTerms('ARTICLE_CATEGORY', articleCategories);
+  const faqCatByKey = await installTerms('FAQ_CATEGORY', faqCategories);
+  const ticketCatByKey = await installTerms('TICKET_CATEGORY', ticketCategories);
+
+  /** Resolves a seed key to its term id, failing loudly rather than silently. */
+  function termId(map: Map<string, string>, key: string, what: string): string {
+    const id = map.get(key);
+    if (!id) throw new Error(`Seed refers to a ${what} that was not created: ${key}`);
+    return id;
+  }
+
   /* --------------------------------------------------------------- people */
   const people: {
     email: string;
@@ -194,7 +260,7 @@ async function main(): Promise<void> {
       slug: 'the-summer-rhythm-inside-kodes-busiest-month',
       title: "The summer rhythm: inside KODE's busiest month",
       excerpt: 'Three thousand check-ins, two new programmes and one very tired coffee machine.',
-      category: 'Club life',
+      categoryId: termId(articleCatByKey, 'CLUB_LIFE', 'news category'),
       pinned: true,
       status: 'PUBLISHED' as const,
       body: 'August is the month the club stops being a building and becomes a rhythm.\n\nFront office handled just over three thousand check-ins, the pool ran at capacity for eleven consecutive mornings, and the racquet team quietly launched two new junior sessions without a single scheduling clash.\n\nWhat made it work was not heroics. It was the handover notes, the shared calendar discipline, and people covering for each other without being asked.',
@@ -203,7 +269,7 @@ async function main(): Promise<void> {
       slug: 'how-the-racquet-team-turns-member-feedback-into-action',
       title: 'How the Racquet team turns member feedback into action',
       excerpt: 'A short loop between a comment card and a changed court schedule.',
-      category: 'People',
+      categoryId: termId(articleCatByKey, 'PEOPLE', 'news category'),
       status: 'PUBLISHED' as const,
       body: 'Every Monday the racquet coaches read the previous week of member comments together. Anything that appears three times becomes an action.\n\nThat is how the 06:30 slot appeared, how the ball machine moved to court four, and why the beginner ladder now runs fortnightly instead of monthly.',
     },
@@ -211,7 +277,7 @@ async function main(): Promise<void> {
       slug: 'a-quieter-arrival-our-new-member-welcome-flow',
       title: 'A quieter arrival: our new member welcome flow',
       excerpt: 'Fewer forms, one named contact and a tour that actually ends at the locker.',
-      category: 'Operations',
+      categoryId: termId(articleCatByKey, 'OPERATIONS', 'news category'),
       status: 'IN_REVIEW' as const,
       body: 'The old welcome took nineteen minutes and three members of staff. The new one takes seven and one.\n\nThe change was mostly subtraction: we removed two forms that duplicated the membership system, and we stopped explaining the app before people had their locker key.',
     },
@@ -219,7 +285,7 @@ async function main(): Promise<void> {
       slug: 'studio-two-reopens-with-a-new-floor',
       title: 'Studio 02 reopens with a new floor',
       excerpt: 'Sprung timber, better acoustics, and the mirror wall finally straight.',
-      category: 'Facilities',
+      categoryId: termId(articleCatByKey, 'FACILITIES', 'news category'),
       status: 'DRAFT' as const,
       body: 'Studio 02 closed for eleven days and reopens on Monday with a sprung timber floor, replacement acoustic panels along the north wall, and a mirror line that is, at last, level.',
     },
@@ -242,29 +308,19 @@ async function main(): Promise<void> {
 
   /* --------------------------------------------------------------- events */
   const day = 86_400_000;
-  /*
-   * Event kinds are rows now, not enum members, so the seed installs them the
-   * same way it installs departments. `isSystem` marks them as built in: the
-   * CMS will let an admin rename, recolour, reorder or archive them, but never
-   * delete them, so the create form's required select cannot be emptied.
+
+  /**
+   * `n` days from now at a stated hour, local time.
+   *
+   * Plain `Date.now() + n * day` keeps the wall-clock time of whenever the seed
+   * happened to run, so seeding at 23:05 scheduled the staff padel evening and
+   * the first aid refresher for 23:05. Demo data should read like real data.
    */
-  const eventKinds = [
-    { key: 'CLUB_MOMENT', label: 'Club moment', colour: '#244EA2', sortOrder: 10 },
-    { key: 'LEARNING', label: 'Learning', colour: '#BFD730', sortOrder: 20 },
-    { key: 'WELLBEING', label: 'Wellbeing', colour: '#7F3F98', sortOrder: 30 },
-    { key: 'ANNOUNCEMENT', label: 'Announcement', colour: '#F26522', sortOrder: 40 },
-  ];
-
-  const kindByKey = new Map<string, string>();
-  for (const term of eventKinds) {
-    const row = await prisma.taxonomy.upsert({
-      where: { kind_key: { kind: 'EVENT_KIND', key: term.key } },
-      update: { label: term.label, colour: term.colour, sortOrder: term.sortOrder },
-      create: { kind: 'EVENT_KIND', isSystem: true, ...term },
-    });
-    kindByKey.set(term.key, row.id);
-  }
-
+  const inDays = (days: number, hour: number): Date => {
+    const when = new Date(Date.now() + days * day);
+    when.setHours(hour, 0, 0, 0);
+    return when;
+  };
   const events = [
     {
       slug: 'staff-padel-evening',
@@ -273,7 +329,7 @@ async function main(): Promise<void> {
       location: 'Padel courts',
       description:
         'Doubles, no scoring pressure, and food afterwards. All levels, racquets provided.',
-      startsAt: new Date(Date.now() + 3 * day),
+      startsAt: inDays(3, 18),
       status: 'PUBLISHED' as const,
     },
     {
@@ -283,7 +339,7 @@ async function main(): Promise<void> {
       location: 'Studio 02',
       description:
         'Annual refresher covering CPR, AED use and the club incident procedure. Required for poolside staff.',
-      startsAt: new Date(Date.now() + 9 * day),
+      startsAt: inDays(9, 10),
       capacity: 24,
       status: 'PUBLISHED' as const,
     },
@@ -294,7 +350,7 @@ async function main(): Promise<void> {
       location: 'Main clubhouse',
       description:
         'Members bring a guest, the club shows its best face. All departments on the floor.',
-      startsAt: new Date(Date.now() + 18 * day),
+      startsAt: inDays(18, 11),
       status: 'PUBLISHED' as const,
     },
     {
@@ -304,7 +360,7 @@ async function main(): Promise<void> {
       location: 'Meeting room 1',
       description:
         'Practical session for staff on rotating shifts. Run by an external occupational health advisor.',
-      startsAt: new Date(Date.now() + 25 * day),
+      startsAt: inDays(25, 14),
       status: 'DRAFT' as const,
     },
   ];
@@ -414,7 +470,17 @@ async function main(): Promise<void> {
     const existing = await prisma.faq.findFirst({ where: { question } });
     if (!existing) {
       await prisma.faq.create({
-        data: { question, answer, category, position, status: 'PUBLISHED' },
+        data: {
+          question,
+          answer,
+          categoryId: termId(
+            faqCatByKey,
+            category.toUpperCase().replace(/[^A-Z0-9]+/g, '_'),
+            'FAQ category',
+          ),
+          position,
+          status: 'PUBLISHED',
+        },
       });
     }
   }
@@ -456,7 +522,7 @@ async function main(): Promise<void> {
         reference: 'KODE-IT-000001',
         subject: 'Court booking screen frozen at reception',
         body: 'The booking terminal at the racquet desk freezes when I open the weekly view. Restarting works for about an hour.',
-        category: 'HARDWARE',
+        categoryId: termId(ticketCatByKey, 'HARDWARE', 'ticket category'),
         priority: 'HIGH',
         status: 'IN_PROGRESS',
         location: 'Racquet reception',

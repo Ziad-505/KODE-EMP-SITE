@@ -3,6 +3,23 @@
 	# Certificates are obtained and renewed automatically over HTTP-01/TLS-ALPN.
 }
 
+# TLS_MODE decides where certificates come from, because the answer differs for
+# an internal deployment and a public one, and getting it wrong is the single
+# most common way this stack fails to come up.
+#
+#   <an email address>  Public ACME. Requires that Let's Encrypt can reach
+#                       ports 80 and 443 on this host from the internet.
+#                       Defaults to ACME_EMAIL, which is the public behaviour.
+#   internal            Caddy's own local CA. Correct for a VM on the company
+#                       network with no inbound path from the internet: ACME
+#                       cannot validate a host it cannot reach, so the stack
+#                       would otherwise sit retrying and serve nothing.
+#                       Browsers then need the Caddy root trusted once — the
+#                       procedure is in docs/DEPLOY-INTERNAL.md.
+(tls_mode) {
+	tls {$TLS_MODE}
+}
+
 (security_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -16,6 +33,7 @@
 
 # ------------------------------------------------------------ employee portal
 {$PORTAL_DOMAIN} {
+	import tls_mode
 	import security_headers
 	encode zstd gzip
 
@@ -36,6 +54,7 @@
 
 # ---------------------------------------------------------------------- CMS
 {$ADMIN_DOMAIN} {
+	import tls_mode
 	import security_headers
 	encode zstd gzip
 

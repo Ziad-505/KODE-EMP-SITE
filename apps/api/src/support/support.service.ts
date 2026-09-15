@@ -8,8 +8,8 @@ import {
 import { Prisma } from '@prisma/client';
 import {
   AuditAction,
+  TaxonomyKind,
   Permission,
-  TicketCategory,
   TicketPriority,
   TicketStatus,
   type CreateTicketInput,
@@ -23,9 +23,11 @@ import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { OutboxService, OutboxTopic } from '../outbox/outbox.service';
+import { TaxonomyService } from '../taxonomy/taxonomy.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 
 const INCLUDE = {
+  category: { select: { id: true, key: true, label: true, colour: true } },
   requester: {
     select: {
       id: true,
@@ -46,6 +48,7 @@ export class SupportService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly taxonomy: TaxonomyService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -59,6 +62,17 @@ export class SupportService {
         department: { select: { name: true } },
       },
     });
+
+    /*
+     * Resolved before the transaction opens, not inside it. `assertUsable` runs
+     * its own query on `this.prisma` — a different connection from `tx` — so
+     * calling it from inside an interactive transaction held one connection
+     * while waiting for a second: with `DATABASE_POOL_SIZE=10` and ten
+     * concurrent submissions, every connection was held by a transaction
+     * waiting for an eleventh that would never come. The category is not part
+     * of what this transaction has to make atomic.
+     */
+    await this.taxonomy.assertUsable(input.categoryId, TaxonomyKind.TICKET_CATEGORY);
 
     // Ticket row and outbound notification commit together, so a crash cannot
     // produce a ticket nobody was told about.
@@ -89,7 +103,7 @@ export class SupportService {
           reference,
           subject: input.subject,
           body: input.body,
-          category: input.category,
+          categoryId: input.categoryId,
           priority: input.priority,
           location: input.location ?? null,
           requesterId: actor.id,
@@ -137,6 +151,10 @@ export class SupportService {
               { subject: { contains: query.q, mode } },
               { body: { contains: query.q, mode } },
               { reference: { contains: query.q, mode } },
+              // News and FAQ search both reach through the relation for the
+              // label. Without the same clause here, searching "network" misses
+              // every ticket whose only match is its category.
+              { category: { label: { contains: query.q, mode } } },
             ],
           }
         : {}),
@@ -241,7 +259,12 @@ export class SupportService {
       reference: row.reference,
       subject: row.subject,
       body: row.body,
-      category: row.category as TicketCategory,
+      category: {
+        id: row.category.id,
+        key: row.category.key,
+        label: row.category.label,
+        colour: row.category.colour,
+      },
       priority: row.priority as TicketPriority,
       status: row.status as TicketStatus,
       location: row.location,
@@ -273,7 +296,7 @@ function buildTicketEmail(
     reference: string;
     subject: string;
     body: string;
-    category: string;
+    category: { key: string; label: string };
     priority: string;
     location: string | null;
   },
@@ -288,7 +311,9 @@ function buildTicketEmail(
     `Reference: ${ticket.reference}`,
     `Requester: ${requester.firstName} ${requester.lastName} <${requester.email}>`,
     `Department: ${requester.department?.name ?? 'Not set'}`,
-    `Category: ${ticket.category}`,
+    // The key, not the label. IT's Odoo rules parse this line, and an admin
+    // renaming "Access" to "Access and logins" must not silently break routing.
+    `Category: ${ticket.category.key} (${ticket.category.label})`,
     `Priority: ${ticket.priority}`,
     `Location: ${ticket.location ?? 'Not given'}`,
     '',

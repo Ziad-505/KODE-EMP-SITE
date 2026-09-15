@@ -103,9 +103,18 @@ export function useTaxonomyMutations() {
   const client = useQueryClient();
   const invalidate = () => {
     void client.invalidateQueries({ queryKey: taxonomyKey });
-    // Event rows embed the term's label and colour, so a rename has to
-    // invalidate content lists too or the CMS shows the old name until reload.
-    void client.invalidateQueries({ queryKey: ['cms', 'events'] });
+    /*
+     * Content rows embed the term's label and colour, so a rename has to
+     * invalidate the content lists too or the CMS shows the old name until
+     * reload — which reads as the rename having silently failed.
+     *
+     * All four namespaces now embed the term, not just events, so this
+     * invalidates the whole `cms` prefix rather than naming one resource. It
+     * refetches a few lists that did not need it; the alternative is a list of
+     * keys that has to be extended every time a namespace is added, and the
+     * events-only version is exactly that omission.
+     */
+    void client.invalidateQueries({ queryKey: ['cms'] });
   };
 
   return {

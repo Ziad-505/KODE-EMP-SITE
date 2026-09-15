@@ -30,7 +30,7 @@ export const createArticleSchema = z.object({
   slug: slugSchema.optional(),
   excerpt: z.string().trim().max(400).nullish(),
   body: richTextSchema,
-  category: z.string().trim().min(1).max(60).default('Club life'),
+  categoryId: cuidSchema,
   coverMediaId: cuidSchema.nullish(),
   departmentId: cuidSchema.nullish(),
   pinned: z.boolean().default(false),
@@ -47,7 +47,7 @@ export interface ArticleDto {
   title: string;
   excerpt: string | null;
   body: string;
-  category: string;
+  category: TaxonomyRefDto;
   pinned: boolean;
   status: ContentStatus;
   coverUrl: string | null;
@@ -159,7 +159,7 @@ export interface PolicyDto {
 export const createFaqSchema = z.object({
   question: z.string().trim().min(5).max(300),
   answer: richTextSchema,
-  category: z.string().trim().min(1).max(60).default('Workplace'),
+  categoryId: cuidSchema,
   position: z.coerce.number().int().min(0).max(9999).default(0),
   departmentId: cuidSchema.nullish(),
   status: contentStatusSchema.default(ContentStatus.DRAFT),
@@ -172,7 +172,7 @@ export interface FaqDto {
   id: string;
   question: string;
   answer: string;
-  category: string;
+  category: TaxonomyRefDto;
   position: number;
   status: ContentStatus;
   department: { id: string; name: string; colour: string } | null;

@@ -1,5 +1,14 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "./dist", "noUnusedLocals": false },
+  // `incremental` is inherited from tsconfig.base.json and is deliberately off
+  // here. A release build must emit unconditionally: with the cache on, a
+  // stale .tsbuildinfo made `nest build` a no-op that still exited 0, so a
+  // broken image built and deployed without a single error line anywhere.
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "./dist",
+    "noUnusedLocals": false,
+    "incremental": false
+  },
   "exclude": ["node_modules", "test", "dist", "**/*.spec.ts", "prisma/seed.ts"]
 }

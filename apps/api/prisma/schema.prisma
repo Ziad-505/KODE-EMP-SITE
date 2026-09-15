@@ -16,7 +16,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* ------------------------------------------------------------------ identity */
+/**
+ * ------------------------------------------------------------------ identity
+ */
 
 enum Role {
   SUPER_ADMIN
@@ -59,20 +61,20 @@ model Department {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  firstName    String
-  lastName     String
-  jobTitle     String?
-  phone        String?
-  role         Role         @default(EMPLOYEE)
-  status       UserStatus   @default(ACTIVE)
-  provider     AuthProvider @default(LOCAL)
+  id        String       @id @default(cuid())
+  email     String       @unique
+  firstName String
+  lastName  String
+  jobTitle  String?
+  phone     String?
+  role      Role         @default(EMPLOYEE)
+  status    UserStatus   @default(ACTIVE)
+  provider  AuthProvider @default(LOCAL)
 
   /// Argon2id hash. Null for Entra-only accounts.
-  passwordHash        String?
-  mustChangePassword  Boolean   @default(false)
-  passwordChangedAt   DateTime?
+  passwordHash       String?
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
 
   /// Entra ID object id (`oid` claim). Unique when present.
   entraObjectId String? @unique
@@ -91,16 +93,16 @@ model User {
   avatarMediaId String? @unique
   avatarMedia   Media?  @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  refreshTokens     RefreshToken[]
-  uploadedMedia     Media[]         @relation("MediaUploader")
-  authoredArticles  Article[]       @relation("ArticleAuthor")
-  auditEntries      AuditLog[]      @relation("AuditActor")
-  requestedTickets  SupportTicket[] @relation("TicketRequester")
-  assignedTickets   SupportTicket[] @relation("TicketAssignee")
+  refreshTokens    RefreshToken[]
+  uploadedMedia    Media[]         @relation("MediaUploader")
+  authoredArticles Article[]       @relation("ArticleAuthor")
+  auditEntries     AuditLog[]      @relation("AuditActor")
+  requestedTickets SupportTicket[] @relation("TicketRequester")
+  assignedTickets  SupportTicket[] @relation("TicketAssignee")
 
   @@index([departmentId])
   @@index([role])
@@ -112,22 +114,22 @@ model User {
 /// re-use of a already-rotated token revokes the whole family, which is the
 /// standard detection for a stolen refresh token.
 model RefreshToken {
-  id         String   @id @default(cuid())
+  id        String @id @default(cuid())
   /// SHA-256 of the token. The raw value never touches the database.
-  tokenHash  String   @unique
-  familyId   String
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  familyId  String
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  expiresAt  DateTime
-  rotatedAt  DateTime?
-  revokedAt  DateTime?
+  expiresAt     DateTime
+  rotatedAt     DateTime?
+  revokedAt     DateTime?
   revokedReason String?
 
-  ipAddress  String?
-  userAgent  String?
+  ipAddress String?
+  userAgent String?
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([familyId])
@@ -137,19 +139,21 @@ model RefreshToken {
 
 /// Short-lived state for the Entra ID authorization-code flow (PKCE + nonce).
 model OidcState {
-  id            String   @id @default(cuid())
-  state         String   @unique
-  codeVerifier  String
-  nonce         String
-  redirectTo    String?
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  state        String   @unique
+  codeVerifier String
+  nonce        String
+  redirectTo   String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
 
   @@index([expiresAt])
   @@map("oidc_states")
 }
 
-/* --------------------------------------------------------------------- media */
+/**
+ * --------------------------------------------------------------------- media
+ */
 
 model Media {
   id         String  @id @default(cuid())
@@ -175,17 +179,17 @@ model Media {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  avatarOf       User?           @relation("UserAvatar")
-  articleCovers  Article[]       @relation("ArticleCover")
-  eventCovers    Event[]         @relation("EventCover")
-  policyDocs     Policy[]        @relation("PolicyDocument")
-  albumCovers    GalleryAlbum[]  @relation("AlbumCover")
-  galleryItems   GalleryItem[]
-  ticketFiles    TicketAttachment[]
+  avatarOf      User?              @relation("UserAvatar")
+  articleCovers Article[]          @relation("ArticleCover")
+  eventCovers   Event[]            @relation("EventCover")
+  policyDocs    Policy[]           @relation("PolicyDocument")
+  albumCovers   GalleryAlbum[]     @relation("AlbumCover")
+  galleryItems  GalleryItem[]
+  ticketFiles   TicketAttachment[]
 
   @@index([mimeType])
   @@index([createdAt])
@@ -193,7 +197,9 @@ model Media {
   @@map("media")
 }
 
-/* ------------------------------------------------------------------- content */
+/**
+ * ------------------------------------------------------------------- content
+ */
 
 enum ContentStatus {
   DRAFT
@@ -203,14 +209,15 @@ enum ContentStatus {
 }
 
 model Article {
-  id       String        @id @default(cuid())
-  slug     String        @unique
-  title    String
-  excerpt  String?
-  body     String
-  category String        @default("Club life")
-  pinned   Boolean       @default(false)
-  status   ContentStatus @default(DRAFT)
+  id         String        @id @default(cuid())
+  slug       String        @unique
+  title      String
+  excerpt    String?
+  body       String
+  categoryId String
+  category   Taxonomy      @relation("ArticleCategoryTerm", fields: [categoryId], references: [id], onDelete: Restrict)
+  pinned     Boolean       @default(false)
+  status     ContentStatus @default(DRAFT)
 
   coverMediaId String?
   coverMedia   Media?  @relation("ArticleCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
@@ -229,12 +236,19 @@ model Article {
   @@index([status, publishedAt])
   @@index([departmentId])
   @@index([deletedAt])
+  @@index([categoryId])
+  // Trigram indexes backing the `contains` searches in SearchService. They are
+  // created by migration 20260815000100 and declared here as well, because the
+  // CI drift check compares the live database against this datamodel: an index
+  // that exists only in hand-written SQL reads as one CI wants to drop. `map`
+  // pins the name the migration already used.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "articles_title_trgm_idx")
+  @@index([body(ops: raw("gin_trgm_ops"))], type: Gin, map: "articles_body_trgm_idx")
   @@map("articles")
 }
 
 /**
  * The namespaces a taxonomy term can belong to.
- *
  * This enum is deliberately closed and the terms inside it are deliberately
  * not. Adding a *kind of list* is a modelling decision that warrants a
  * migration; adding an entry *to* a list is an editorial decision that should
@@ -254,31 +268,32 @@ enum TaxonomyKind {
  * An admin-managed term. Replaces the `EventKind` Postgres enum, and is the
  * intended home for article, FAQ and ticket categories, which are currently
  * modelled two other ways (a second enum and unconstrained free text).
- *
  * `key` is immutable and machine-facing; `label` is what people see and may be
  * renamed freely, which is what makes "Club Life" and "club life" impossible
  * to create as separate things. `isSystem` marks terms the seed installs and
  * the UI refuses to delete, so an admin cannot empty a list the code assumes
  * is non-empty.
- *
  * Terms are archived rather than deleted once used, because a hard delete
  * would either orphan rows or cascade into content.
  */
 model Taxonomy {
-  id         String       @id @default(cuid())
-  kind       TaxonomyKind
-  key        String
-  label      String
+  id          String       @id @default(cuid())
+  kind        TaxonomyKind
+  key         String
+  label       String
   description String?
-  colour     String       @default("#244EA2")
-  sortOrder  Int          @default(0)
-  isSystem   Boolean      @default(false)
-  archivedAt DateTime?
+  colour      String       @default("#244EA2")
+  sortOrder   Int          @default(0)
+  isSystem    Boolean      @default(false)
+  archivedAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events Event[] @relation("EventKindTerm")
+  events   Event[]         @relation("EventKindTerm")
+  articles Article[]       @relation("ArticleCategoryTerm")
+  faqs     Faq[]           @relation("FaqCategoryTerm")
+  tickets  SupportTicket[] @relation("TicketCategoryTerm")
 
   @@unique([kind, key])
   @@index([kind, archivedAt, sortOrder])
@@ -315,6 +330,7 @@ model Event {
   @@index([departmentId])
   @@index([deletedAt])
   @@index([kindId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "events_title_trgm_idx")
   @@map("events")
 }
 
@@ -345,16 +361,19 @@ model Policy {
   @@index([departmentId])
   @@index([reviewDueAt])
   @@index([deletedAt])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "policies_title_trgm_idx")
+  @@index([body(ops: raw("gin_trgm_ops"))], type: Gin, map: "policies_body_trgm_idx")
   @@map("policies")
 }
 
 model Faq {
-  id       String        @id @default(cuid())
-  question String
-  answer   String
-  category String        @default("Workplace")
-  position Int           @default(0)
-  status   ContentStatus @default(DRAFT)
+  id         String        @id @default(cuid())
+  question   String
+  answer     String
+  categoryId String
+  category   Taxonomy      @relation("FaqCategoryTerm", fields: [categoryId], references: [id], onDelete: Restrict)
+  position   Int           @default(0)
+  status     ContentStatus @default(DRAFT)
 
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -365,6 +384,8 @@ model Faq {
 
   @@index([status, position])
   @@index([deletedAt])
+  @@index([categoryId])
+  @@index([question(ops: raw("gin_trgm_ops"))], type: Gin, map: "faqs_question_trgm_idx")
   @@map("faqs")
 }
 
@@ -394,13 +415,13 @@ model GalleryAlbum {
 }
 
 model GalleryItem {
-  id       String @id @default(cuid())
+  id       String       @id @default(cuid())
   albumId  String
   album    GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
   mediaId  String
-  media    Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  media    Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   caption  String?
-  position Int    @default(0)
+  position Int          @default(0)
 
   @@unique([albumId, mediaId])
   @@index([albumId, position])
@@ -424,7 +445,9 @@ model QuickLink {
   @@map("quick_links")
 }
 
-/* ------------------------------------------------------------------ support */
+/**
+ * ------------------------------------------------------------------ support
+ */
 
 enum TicketStatus {
   OPEN
@@ -441,24 +464,17 @@ enum TicketPriority {
   URGENT
 }
 
-enum TicketCategory {
-  HARDWARE
-  SOFTWARE
-  NETWORK
-  ACCESS
-  OTHER
-}
-
 model SupportTicket {
-  id        String         @id @default(cuid())
+  id         String         @id @default(cuid())
   /// Human-facing reference, e.g. KODE-IT-000142. Unique, monotonic.
-  reference String         @unique
-  subject   String
-  body      String
-  category  TicketCategory @default(OTHER)
-  priority  TicketPriority @default(NORMAL)
-  status    TicketStatus   @default(OPEN)
-  location  String?
+  reference  String         @unique
+  subject    String
+  body       String
+  categoryId String
+  category   Taxonomy       @relation("TicketCategoryTerm", fields: [categoryId], references: [id], onDelete: Restrict)
+  priority   TicketPriority @default(NORMAL)
+  status     TicketStatus   @default(OPEN)
+  location   String?
   resolution String?
 
   requesterId String
@@ -477,6 +493,7 @@ model SupportTicket {
 
   @@index([status, createdAt])
   @@index([requesterId])
+  @@index([categoryId])
   @@map("support_tickets")
 }
 
@@ -493,20 +510,22 @@ model TicketAttachment {
 /// Outbound email queue. Written in the same transaction as the ticket so a
 /// crash between "ticket saved" and "email sent" cannot lose the notification.
 model OutboxMessage {
-  id          String    @id @default(cuid())
-  topic       String
-  payload     Json
-  attempts    Int       @default(0)
-  lastError   String?
-  processedAt DateTime?
-  nextAttemptAt DateTime @default(now())
-  createdAt   DateTime  @default(now())
+  id            String    @id @default(cuid())
+  topic         String
+  payload       Json
+  attempts      Int       @default(0)
+  lastError     String?
+  processedAt   DateTime?
+  nextAttemptAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
 
   @@index([processedAt, nextAttemptAt])
   @@map("outbox_messages")
 }
 
-/* -------------------------------------------------------------------- audit */
+/**
+ * -------------------------------------------------------------------- audit
+ */
 
 enum AuditAction {
   CREATE

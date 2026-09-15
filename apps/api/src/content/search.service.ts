@@ -39,7 +39,7 @@ export class SearchService {
           ...visible,
           OR: [{ title: { contains: q, mode } }, { excerpt: { contains: q, mode } }],
         },
-        select: { id: true, slug: true, title: true, category: true },
+        select: { id: true, slug: true, title: true, category: { select: { label: true } } },
         take,
       }),
       this.prisma.event.findMany({
@@ -63,7 +63,7 @@ export class SearchService {
           ...visible,
           OR: [{ question: { contains: q, mode } }, { answer: { contains: q, mode } }],
         },
-        select: { id: true, question: true, category: true },
+        select: { id: true, question: true, category: { select: { label: true } } },
         take,
       }),
       this.prisma.galleryAlbum.findMany({
@@ -89,7 +89,7 @@ export class SearchService {
 
     const results: SearchResultDto[] = [
       ...articles.map((row) =>
-        item('news', row.id, row.slug, row.title, row.category, `/news/${row.slug}`, q),
+        item('news', row.id, row.slug, row.title, row.category.label, `/news/${row.slug}`, q),
       ),
       ...events.map((row) =>
         item(
@@ -114,7 +114,7 @@ export class SearchService {
         ),
       ),
       ...faqs.map((row) =>
-        item('faq', row.id, null, row.question, row.category, `/faqs#${row.id}`, q),
+        item('faq', row.id, null, row.question, row.category.label, `/faqs#${row.id}`, q),
       ),
       ...albums.map((row) =>
         item(

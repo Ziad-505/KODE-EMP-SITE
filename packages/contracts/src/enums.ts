@@ -47,15 +47,21 @@ export const TicketPriority = {
 export type TicketPriority = (typeof TicketPriority)[keyof typeof TicketPriority];
 export const ALL_TICKET_PRIORITIES = Object.values(TicketPriority) as readonly TicketPriority[];
 
-export const TicketCategory = {
-  HARDWARE: 'HARDWARE',
-  SOFTWARE: 'SOFTWARE',
-  NETWORK: 'NETWORK',
-  ACCESS: 'ACCESS',
-  OTHER: 'OTHER',
-} as const;
-export type TicketCategory = (typeof TicketCategory)[keyof typeof TicketCategory];
-export const ALL_TICKET_CATEGORIES = Object.values(TicketCategory) as readonly TicketCategory[];
+/**
+ * Ticket categories moved to the `taxonomies` table alongside event kinds and
+ * the two former free-text category columns, so all four are now one model an
+ * administrator can manage. These keys are what the seed installs; they are
+ * marked `isSystem` because IT's Odoo rules parse the category out of the
+ * notification email and must not have a value deleted from under them.
+ */
+export const SEEDED_TICKET_CATEGORY_KEYS = [
+  'HARDWARE',
+  'SOFTWARE',
+  'NETWORK',
+  'ACCESS',
+  'OTHER',
+] as const;
+export type SeededTicketCategoryKey = (typeof SEEDED_TICKET_CATEGORY_KEYS)[number];
 
 /**
  * Event kinds are no longer an enum. They live in the `taxonomies` table so an

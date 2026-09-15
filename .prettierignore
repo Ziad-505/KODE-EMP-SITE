@@ -4,3 +4,6 @@ coverage
 pnpm-lock.yaml
 apps/api/prisma/migrations
 setup.ps1
+
+# A standalone copy of the portal with its own repository and toolchain.
+prototype/

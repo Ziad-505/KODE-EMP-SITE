@@ -19,13 +19,10 @@ import { Icon } from '../components/icon';
  * hand-written migration, a contracts rebuild and a coordinated redeploy of the
  * API and both SPAs. It is now a form.
  *
- * Only `EVENT_KIND` is wired to content today. The other three namespaces are
- * shown because the table and the API already handle them identically; the work
- * left is moving the columns that still use enums and free text onto the same
- * foreign key.
+ * All four namespaces are live. They were previously modelled three different
+ * ways — two Postgres enums and two unconstrained free-text columns — and are
+ * now one table with one set of rules.
  */
-const WIRED: readonly TaxonomyKind[] = [TaxonomyKind.EVENT_KIND];
-
 const SWATCHES = ['#244EA2', '#F26522', '#BFD730', '#7F3F98', '#ED0C6E', '#FEC20E', '#15162B'];
 
 export function TaxonomyPage() {
@@ -60,7 +57,6 @@ export function TaxonomyPage() {
       <div className="taxonomy-layout">
         <nav className="taxonomy-switch" aria-label="List type">
           {ALL_TAXONOMY_KINDS.map((entry) => {
-            const wired = WIRED.includes(entry);
             return (
               <button
                 key={entry}
@@ -71,20 +67,12 @@ export function TaxonomyPage() {
               >
                 <b>{TAXONOMY_KIND_LABEL[entry]}</b>
                 <span>{TAXONOMY_KIND_HINT[entry]}</span>
-                {!wired ? <em>NOT YET WIRED</em> : null}
               </button>
             );
           })}
         </nav>
 
         <section className="taxonomy-panel">
-          {!WIRED.includes(kind) ? (
-            <p className="taxonomy-note">
-              This list is stored and editable, but the content that will use it still reads from a
-              fixed set in the database. Terms added here take effect once that column is migrated.
-            </p>
-          ) : null}
-
           {error ? (
             <p className="cms-alert" role="alert">
               {error instanceof ApiError ? error.message : 'Could not load this list.'}

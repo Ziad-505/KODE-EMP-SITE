@@ -4,6 +4,7 @@ import {
   AuditAction,
   ContentStatus,
   Permission,
+  slugify,
   type AdminListQuery,
   type ChangeStatusInput,
   type CreatePolicyInput,
@@ -240,9 +241,28 @@ export class PoliciesService {
     return row;
   }
 
+  /**
+   * Next free slug for this table.
+   *
+   * Two changes from the original. It filters on the slug prefix instead of
+   * loading every slug in the table into memory on each create, and it no
+   * longer excludes soft-deleted rows implicitly: a soft-deleted row still owns
+   * its slug at the database level (the unique index does not care about
+   * `deletedAt`), so pretending otherwise produced a P2002 on what looked like
+   * a free name.
+   *
+   * The check-then-insert is still not atomic — two editors publishing the same
+   * title in the same instant both compute the same candidate and the second
+   * gets a 409 from the unique index. That is the correct outcome, and the
+   * index is the real guarantee; this only makes the common case pleasant.
+   */
   private async nextSlug(desired: string, excludeId?: string): Promise<string> {
+    const base = slugify(desired) || 'item';
     const taken = await this.prisma.policy.findMany({
-      where: excludeId ? { NOT: { id: excludeId } } : {},
+      where: {
+        slug: { startsWith: base },
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
       select: { slug: true },
     });
     return uniqueSlug(

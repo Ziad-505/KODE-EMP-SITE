@@ -10,6 +10,10 @@ export default tseslint.config(
       '**/coverage/**',
       '**/*.config.*',
       '**/prisma/migrations/**',
+      // A standalone copy of the portal for design review, outside the pnpm
+      // workspace with its own toolchain. Linting it from here would report the
+      // same findings twice.
+      'prototype/**',
     ],
   },
   js.configs.recommended,

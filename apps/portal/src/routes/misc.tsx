@@ -54,7 +54,7 @@ export function FaqsPage() {
               >
                 <span className="tnum">{String(index + 1).padStart(2, '0')}</span>
                 <div>
-                  <small>{faq.category.toUpperCase()}</small>
+                  <small>{faq.category.label.toUpperCase()}</small>
                   <h2>{faq.question}</h2>
                 </div>
                 <Icon name={open === faq.id ? 'close' : 'plus'} />

@@ -4,6 +4,7 @@ import {
   AuditAction,
   ContentStatus,
   Permission,
+  slugify,
   TaxonomyKind,
   type ChangeStatusInput,
   type CreateEventInput,
@@ -192,6 +193,14 @@ export class EventsService {
       }
     }
 
+    // The same check `create` makes. The foreign key only proves the id names
+    // some row in `taxonomies`; it cannot tell an event kind from a news
+    // category, and it does not know about archiving. Without this, a term that
+    // cannot be chosen on create is still applicable on edit.
+    if (input.kindId !== undefined) {
+      await this.taxonomy.assertUsable(input.kindId, TaxonomyKind.EVENT_KIND);
+    }
+
     const row = await this.prisma.event.update({
       where: { id },
       data: {
@@ -272,9 +281,28 @@ export class EventsService {
     return row;
   }
 
+  /**
+   * Next free slug for this table.
+   *
+   * Two changes from the original. It filters on the slug prefix instead of
+   * loading every slug in the table into memory on each create, and it no
+   * longer excludes soft-deleted rows implicitly: a soft-deleted row still owns
+   * its slug at the database level (the unique index does not care about
+   * `deletedAt`), so pretending otherwise produced a P2002 on what looked like
+   * a free name.
+   *
+   * The check-then-insert is still not atomic — two editors publishing the same
+   * title in the same instant both compute the same candidate and the second
+   * gets a 409 from the unique index. That is the correct outcome, and the
+   * index is the real guarantee; this only makes the common case pleasant.
+   */
   private async nextSlug(desired: string, excludeId?: string): Promise<string> {
+    const base = slugify(desired) || 'item';
     const taken = await this.prisma.event.findMany({
-      where: excludeId ? { NOT: { id: excludeId } } : {},
+      where: {
+        slug: { startsWith: base },
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
       select: { slug: true },
     });
     return uniqueSlug(

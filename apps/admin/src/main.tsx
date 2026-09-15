@@ -18,6 +18,7 @@ import { AuditPage } from './routes/audit';
 import { TaxonomyPage } from './routes/taxonomy';
 import { AccessPage } from './routes/access';
 import { LinksPage } from './routes/links';
+import { CmsNotFoundPage } from './routes/not-found';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,7 +96,7 @@ createRoot(document.getElementById('root')!).render(
                   </RequireCms>
                 }
               />
-              <Route path="*" element={<DashboardPage />} />
+              <Route path="*" element={<CmsNotFoundPage />} />
             </Route>
           </Routes>
         </AuthProvider>

@@ -16,6 +16,14 @@ import { PrismaService } from '../src/prisma/prisma.service';
 describe('Authentication and authorization (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  /**
+   * Articles carry a taxonomy term id now rather than free text, and it is
+   * required — the old `category` column had a default, so these payloads used
+   * to be able to omit it. Resolved from the database rather than hard-coded,
+   * because the row's id differs depending on whether it arrived from the seed
+   * (a cuid) or from the backfill migration (a deterministic `tax_art_*` id).
+   */
+  let articleCategoryId: string;
 
   const PASSWORD = process.env.SEED_EMPLOYEE_PASSWORD ?? 'KodeClub!2026demo';
   const ADMIN = {
@@ -43,6 +51,12 @@ describe('Authentication and authorization (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+
+    const category = await prisma.taxonomy.findFirstOrThrow({
+      where: { kind: 'ARTICLE_CATEGORY', archivedAt: null },
+      orderBy: { sortOrder: 'asc' },
+    });
+    articleCategoryId = category.id;
   });
 
   afterAll(async () => {
@@ -166,6 +180,7 @@ describe('Authentication and authorization (e2e)', () => {
         .send({
           title: 'Editor tries to publish',
           body: 'The service should force this into review instead.',
+          categoryId: articleCategoryId,
           status: 'PUBLISHED',
         })
         .expect(201);
@@ -184,6 +199,7 @@ describe('Authentication and authorization (e2e)', () => {
         .send({
           title: 'Transition probe',
           body: 'Body copy for the transition probe.',
+          categoryId: articleCategoryId,
           status: 'DRAFT',
         })
         .expect(201);
@@ -212,7 +228,12 @@ describe('Authentication and authorization (e2e)', () => {
         .post('/api/v1/cms/news')
         .set('Cookie', manager.cookies)
         .set('X-CSRF-Token', manager.csrf)
-        .send({ title: 'Not for employees yet', body: 'Draft body copy.', status: 'DRAFT' })
+        .send({
+          title: 'Not for employees yet',
+          body: 'Draft body copy.',
+          categoryId: articleCategoryId,
+          status: 'DRAFT',
+        })
         .expect(201);
 
       const employee = await signIn(EMPLOYEE);
