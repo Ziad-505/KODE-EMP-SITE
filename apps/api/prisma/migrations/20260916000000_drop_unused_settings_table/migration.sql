@@ -1,0 +1,15 @@
+-- The `settings` table is created by the initial migration and has never been
+-- read or written by any code path.
+--
+-- It was intended as the home for admin-managed configuration. That need was
+-- met instead by the purpose-built `taxonomies` table, which arrived in
+-- 20260816000000 with its own constraints, audit trail and CMS screen. A
+-- key/value blob would have been strictly worse for that job and there is no
+-- second use waiting for it.
+--
+-- The permission that guarded it, `settings:manage`, is NOT dead and is not
+-- touched here: it is what gates taxonomy writes today.
+--
+-- Dropping is safe because nothing writes it, so it is guaranteed empty in any
+-- deployment. IF EXISTS so a database that somehow never had it still applies.
+DROP TABLE IF EXISTS "settings";

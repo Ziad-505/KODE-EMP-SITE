@@ -7,6 +7,13 @@ import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AccessTokenPayload, RefreshTokenPayload } from './jwt-payload';
 
+/**
+ * How long a spent refresh token stays on file past its own expiry, so replay
+ * detection still has something to match against. Seven days covers the gap
+ * between a theft and a lazy attacker.
+ */
+const REPLAY_EVIDENCE_GRACE_DAYS = 7;
+
 export interface IssuedTokens {
   accessToken: string;
   refreshToken: string;
@@ -169,11 +176,30 @@ export class TokenService {
     });
   }
 
-  /** Housekeeping: drop tokens that can no longer be used. */
+  /**
+   * Housekeeping: drop tokens that can no longer be used *and* can no longer
+   * tell us anything.
+   *
+   * Replay detection works by finding a row that is already rotated or revoked
+   * and revoking its whole family. Deleting revoked rows after 24 hours deleted
+   * exactly that evidence: a token stolen on Monday and replayed on Wednesday
+   * matched nothing, so it read as an ordinary unknown token and raised no
+   * alarm. The window has to outlive the token, not undercut it.
+   *
+   * Retention is therefore the refresh token's own lifetime plus a margin, so a
+   * spent token stays recognisable for as long as the attacker could plausibly
+   * still be holding it. Rows are small and there are a few per person per
+   * fortnight; this costs nothing to keep.
+   */
   async purgeExpired(): Promise<number> {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const retentionDays = this.env.REFRESH_TOKEN_TTL_DAYS + REPLAY_EVIDENCE_GRACE_DAYS;
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const result = await this.prisma.refreshToken.deleteMany({
-      where: { OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }] },
+      // Both dates, so a row survives until the later of the two has passed.
+      where: {
+        expiresAt: { lt: cutoff },
+        OR: [{ revokedAt: null }, { revokedAt: { lt: cutoff } }],
+      },
     });
     return result.count;
   }

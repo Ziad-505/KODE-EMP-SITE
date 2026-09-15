@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type SearchQuery, type SearchResultDto } from '@kode/contracts';
+import { Permission, type SearchQuery, type SearchResultDto } from '@kode/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ContentPolicy } from './content.policy';
@@ -32,6 +32,7 @@ export class SearchService {
     // AND-composed so the per-table text `OR` below cannot displace it.
     const visible = { AND: this.policy.portalVisibility(actor) };
     const take = Math.ceil(query.limit / 2);
+    const canSeePeople = actor?.can(Permission.DIRECTORY_READ) ?? false;
 
     const [articles, events, policies, faqs, albums, people] = await Promise.all([
       this.prisma.article.findMany({
@@ -71,20 +72,35 @@ export class SearchService {
         select: { id: true, slug: true, title: true, _count: { select: { items: true } } },
         take,
       }),
-      this.prisma.user.findMany({
-        where: {
-          deletedAt: null,
-          status: 'ACTIVE',
-          OR: [
-            { firstName: { contains: q, mode } },
-            { lastName: { contains: q, mode } },
-            { email: { contains: q, mode } },
-            { jobTitle: { contains: q, mode } },
-          ],
-        },
-        select: { id: true, firstName: true, lastName: true, jobTitle: true },
-        take,
-      }),
+      /*
+       * People are the one result type behind a permission.
+       *
+       * Search used to query this table unconditionally, so the staff directory
+       * was reachable through the command palette by anyone signed in — no
+       * `directory:read` required. That was invisible while every seeded role
+       * happened to hold it, and would have surfaced the moment someone created
+       * a restricted role (a contractor, an intern) and reasonably expected
+       * removing the permission to remove the people.
+       *
+       * The route's own `@RequirePermissions` cannot express this, because the
+       * other five result types must stay available to a caller without it.
+       */
+      canSeePeople
+        ? this.prisma.user.findMany({
+            where: {
+              deletedAt: null,
+              status: 'ACTIVE',
+              OR: [
+                { firstName: { contains: q, mode } },
+                { lastName: { contains: q, mode } },
+                { email: { contains: q, mode } },
+                { jobTitle: { contains: q, mode } },
+              ],
+            },
+            select: { id: true, firstName: true, lastName: true, jobTitle: true },
+            take,
+          })
+        : Promise.resolve([]),
     ]);
 
     const results: SearchResultDto[] = [

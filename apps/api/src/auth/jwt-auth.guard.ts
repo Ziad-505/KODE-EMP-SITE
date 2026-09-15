@@ -8,17 +8,12 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import type { Permission, Role } from '@kode/contracts';
+import type { Permission } from '@kode/contracts';
 import type { Request } from 'express';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { RequestContextStore } from '../common/request-context';
-import {
-  IS_PUBLIC,
-  PERMISSION_MODE,
-  REQUIRED_PERMISSIONS,
-  REQUIRED_ROLES,
-} from './auth.decorators';
+import { IS_PUBLIC, REQUIRED_PERMISSIONS } from './auth.decorators';
 import { AuthenticatedUser } from './authenticated-user';
 import type { AccessTokenPayload } from './jwt-payload';
 import { ACCESS_COOKIE } from './cookie.util';
@@ -135,21 +130,12 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('This account is no longer active');
     }
 
-    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(REQUIRED_ROLES, targets);
-    if (requiredRoles?.length && !requiredRoles.includes(user.role)) {
-      throw new ForbiddenException('Your role does not allow this action');
-    }
-
+    // Permissions only. The role branch that used to sit here was unreachable —
+    // no route ever carried `@RequireRoles` — and it compared role names, which
+    // is what this model replaced. Guards should contain rules that run.
     const required = this.reflector.getAllAndOverride<Permission[]>(REQUIRED_PERMISSIONS, targets);
-    if (required?.length) {
-      const mode =
-        this.reflector.getAllAndOverride<'any' | 'all'>(PERMISSION_MODE, targets) ?? 'all';
-      const allowed = mode === 'any' ? user.canAny(required) : user.canAll(required);
-      if (!allowed) {
-        throw new ForbiddenException(
-          `Missing permission: ${required.join(mode === 'any' ? ' or ' : ', ')}`,
-        );
-      }
+    if (required?.length && !user.canAll(required)) {
+      throw new ForbiddenException(`Missing permission: ${required.join(', ')}`);
     }
 
     return true;

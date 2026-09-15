@@ -1,12 +1,10 @@
 import { SetMetadata, createParamDecorator, type ExecutionContext } from '@nestjs/common';
-import type { Permission, Role } from '@kode/contracts';
+import type { Permission } from '@kode/contracts';
 import type { Request } from 'express';
 import type { AuthenticatedUser } from './authenticated-user';
 
 export const IS_PUBLIC = 'auth:public';
 export const REQUIRED_PERMISSIONS = 'auth:permissions';
-export const PERMISSION_MODE = 'auth:permission-mode';
-export const REQUIRED_ROLES = 'auth:roles';
 
 /**
  * Marks a route as reachable without authentication.
@@ -21,19 +19,18 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
 export const RequirePermissions = (...permissions: Permission[]) =>
   SetMetadata(REQUIRED_PERMISSIONS, permissions);
 
-/** Requires at least one of the listed permissions. */
-export function RequireAnyPermission(...permissions: Permission[]) {
-  return (target: object, key?: string | symbol, descriptor?: PropertyDescriptor) => {
-    SetMetadata(REQUIRED_PERMISSIONS, permissions)(target, key as string, descriptor!);
-    SetMetadata(PERMISSION_MODE, 'any')(target, key as string, descriptor!);
-  };
-}
-
-/**
- * Role checks are a blunt instrument. Prefer RequirePermissions; reach for this
- * only where the rule genuinely is "this role and no other".
+/*
+ * `RequireRoles` and `RequireAnyPermission` used to live here. Both were
+ * exported and applied to no route, so their branches in jwt-auth.guard.ts were
+ * unreachable — untested code inside the one guard that decides who may do
+ * what.
+ *
+ * `RequireRoles` in particular is not worth keeping available: it matched on
+ * role names, which is the exact coupling this permission model exists to
+ * avoid. Leaving it exported was an invitation to reintroduce that. If a rule
+ * genuinely needs "any of these permissions", add it back deliberately, with a
+ * route using it and a test covering it.
  */
-export const RequireRoles = (...roles: Role[]) => SetMetadata(REQUIRED_ROLES, roles);
 
 /** Injects the authenticated user, or a single property of it. */
 export const CurrentUser = createParamDecorator(

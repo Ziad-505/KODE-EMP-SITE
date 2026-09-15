@@ -20,6 +20,30 @@
 	tls {$TLS_MODE}
 }
 
+# A Content-Security-Policy belongs here rather than on the API, because the
+# API returns JSON and JSON executes nothing. The documents that run the
+# application are served by nginx behind this proxy, and they previously carried
+# no policy at all.
+#
+# Why each directive is what it is:
+#
+#   default-src 'self'      Everything not named below comes from this origin.
+#   script-src  'self'      Vite emits one hashed bundle; no inline scripts, no
+#                           CDN. This is the directive that actually contains an
+#                           injected <script>.
+#   style-src   + unsafe-inline
+#                           Not optional: the apps set inline style attributes
+#                           for department colours and the skew device, which a
+#                           strict style-src would blank. Inline *styles* cannot
+#                           execute; inline *scripts* still cannot run.
+#   img-src     + data:     Inlined small assets and generated avatars.
+#   connect-src 'self'      Same-origin API only, which is already the design.
+#   font-src    'self'      Fonts are bundled, not fetched from Google.
+#   frame-ancestors 'none'  Clickjacking, and the modern replacement for the
+#                           X-Frame-Options line kept above for old browsers.
+#   form-action 'self'      A injected form cannot post credentials elsewhere.
+#   base-uri    'none'      Blocks <base> tag hijacking of every relative URL.
+#   object-src  'none'      No Flash/applet surface at all.
 (security_headers) {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -27,8 +51,24 @@
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'; object-src 'none'"
+		Cross-Origin-Opener-Policy "same-origin"
 		-Server
 	}
+}
+
+# The CMS is not the portal. It is reachable by a handful of staff, it can
+# publish content and change roles, and on a public deployment there is no
+# reason for it to answer the whole internet.
+#
+# Set ADMIN_ALLOWED_IPS in .env to a space-separated list of CIDR ranges — the
+# office egress IP, the VPN pool — and everything else gets a 403 before it ever
+# reaches a login form. Leave it empty and the CMS stays open to any address,
+# which is the right default for an internal-only deployment and the wrong one
+# for a public host.
+(admin_ip_allowlist) {
+	@blocked not remote_ip {$ADMIN_ALLOWED_IPS:0.0.0.0/0 ::/0}
+	respond @blocked "Not available from this network." 403
 }
 
 # ------------------------------------------------------------ employee portal
@@ -56,6 +96,7 @@
 {$ADMIN_DOMAIN} {
 	import tls_mode
 	import security_headers
+	import admin_ip_allowlist
 	encode zstd gzip
 
 	handle /api/* {

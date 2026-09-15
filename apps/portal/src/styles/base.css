@@ -986,6 +986,16 @@ textarea:focus-visible {
   outline: 0;
   font-size: 14px;
   font-weight: 500;
+  /* 36px is the minimum comfortable touch target. Padding alone left these at
+     33px for inputs and 35px for selects — close enough to look fine and far
+     enough to be missed on a phone, which is where most IT requests are
+     raised. */
+  min-height: 36px;
+}
+
+.form-panel textarea {
+  /* The shared minimum must not shrink the multi-line field. */
+  min-height: 96px;
 }
 
 .form-panel input::placeholder,

@@ -25,7 +25,10 @@ a {
 
 /* The nav items were buttons; anchors need the same box. */
 .floating-header nav a {
-  height: 35px;
+  /* 36px, not 35. Every primary navigation link sat exactly one pixel under the
+     minimum — invisible on a desktop mouse, and the single most-tapped control
+     in the portal on a phone. */
+  height: 36px;
   display: inline-flex;
   align-items: center;
   color: rgba(255, 255, 255, 0.72);
@@ -1702,7 +1705,14 @@ a {
 
 .filter-bar input {
   flex: 1 1 240px;
-  min-width: 0;
+  /* A real floor, not `min-width: 0`.
+     Zero is the usual flexbox escape hatch for letting an item shrink below its
+     content, but here it let the search field yield *all* its width to the
+     sibling controls: on the directory at 1024px it collapsed to 34px, so the
+     placeholder was invisible and the field was barely clickable. `min()` keeps
+     the floor from overflowing a container narrower than 200px, and the
+     wrap-to-full-width rule below still takes over on phones. */
+  min-width: min(200px, 100%);
   min-height: 52px;
   border: 1px solid var(--line);
   border-radius: 0;
@@ -1811,8 +1821,18 @@ a {
   border-radius: 0;
 }
 
+/* 36px, not 34.
+   Ten of these stack in a column on a phone, and a mis-tap opens a mail client
+   addressed to the wrong colleague. An earlier pass set 34px here, which reads
+   as "roughly right" and measures as under the minimum — and because this rule
+   sits later in the file it quietly won against anything set above. One rule
+   owns this hit area; keep it that way. */
 .person-card a {
-  min-height: 34px;
+  min-height: 36px;
+  /* The card is a flex column, so these are flex items and `min-height` alone
+     still let them be compressed below it — one link measured 34px while
+     computing 36px. `flex: none` opts them out of shrinking. */
+  flex: none;
   display: flex;
   align-items: center;
   word-break: break-word;
@@ -2000,7 +2020,43 @@ a {
 .account-button,
 .global-search {
   min-height: 36px;
+  /* Both dimensions. Height alone left these 33-34px wide, which is the axis a
+     thumb actually misses on a narrow icon button. */
+  min-width: 36px;
   height: auto;
   padding-top: 6px;
   padding-bottom: 6px;
+}
+
+/* Route chunk placeholder. Holds the inner-page rhythm so the real screen does
+   not shift the layout when it arrives. */
+.page-skeleton {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.skeleton-banner {
+  min-height: 180px;
+  border-radius: 4px;
+}
+
+@media (max-width: 720px) {
+  .page-skeleton {
+    padding: 0 16px;
+  }
+
+  .skeleton-banner {
+    min-height: 120px;
+  }
+}
+
+/* The brand mark in the header is a link, and was 25px wide. Narrow targets in
+   the top corner are the ones people reach for one-handed. */
+.brand-button {
+  min-width: 36px;
+  justify-content: center;
 }

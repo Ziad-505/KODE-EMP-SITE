@@ -86,7 +86,17 @@ export class PortalController {
     };
   }
 
+  /**
+   * Every other route on this controller carries an explicit permission; this
+   * one did not, which made it the single unannotated route of fourteen.
+   *
+   * `NEWS_READ` is the floor for using the palette at all. It is deliberately
+   * not the whole rule: the service filters each result type by what the caller
+   * may actually see, and gates people on `directory:read`, because one
+   * annotation cannot express six different visibility rules.
+   */
   @Get('search')
+  @RequirePermissions(Permission.NEWS_READ)
   @ApiOperation({ summary: 'Cross-content search for the command palette' })
   searchAll(
     @Query(ZodQuery(searchQuerySchema)) query: SearchQuery,

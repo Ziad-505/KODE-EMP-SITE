@@ -69,6 +69,22 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - uploads:/app/storage/uploads
+    # `restart: always` only catches a process that exits. An API that is hung
+    # but alive stays "up" forever unless something asks it whether it works —
+    # which is exactly what /health/ready exists to answer. Node is already in
+    # the image, so this needs no extra package.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     networks: [internal]
     logging: *logging
 
@@ -80,6 +96,11 @@ services:
         APP: portal
         VITE_API_URL: /api/v1
     restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/ || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks: [internal]
     logging: *logging
 
@@ -92,13 +113,23 @@ services:
         VITE_API_URL: /api/v1
         VITE_PORTAL_URL: https://${PORTAL_DOMAIN}
     restart: always
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/ || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks: [internal]
     logging: *logging
 
   caddy:
     image: caddy:2-alpine
     restart: always
-    depends_on: [api, portal, admin]
+    # Healthy, not merely started: without a condition Caddy begins proxying
+    # while the API is still booting, and the first requests after a deploy 502.
+    depends_on:
+      api: { condition: service_healthy }
+      portal: { condition: service_healthy }
+      admin: { condition: service_healthy }
     ports:
       - '80:80'
       - '443:443'
@@ -110,6 +141,8 @@ services:
       # Defaults to the ACME email, i.e. public certificates, unchanged. Set
       # TLS_MODE=internal in .env for a VM the internet cannot reach.
       TLS_MODE: ${TLS_MODE:-${ACME_EMAIL}}
+      # Blank means "any address", which is what the Caddyfile default encodes.
+      ADMIN_ALLOWED_IPS: ${ADMIN_ALLOWED_IPS:-0.0.0.0/0 ::/0}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
